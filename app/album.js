@@ -121,6 +121,37 @@
     }).catch(function () { /* No internet or blocked: the patterned tiles stay. */ });
   }
 
+  // "Why we recommend it" details open in a pop-up over the page.
+  var moreList = [];
+  function moreButton(p) {
+    if (!p.more) return "";
+    moreList.push(p);
+    return '<button class="btn small why" type="button" data-more="' + (moreList.length - 1) + '">Why we recommend it</button>';
+  }
+  function openMore(p) {
+    var d = document.getElementById("more-dialog");
+    if (!d) {
+      d = document.createElement("dialog"); d.id = "more-dialog"; d.className = "more";
+      d.setAttribute("aria-labelledby", "more-title");
+      document.body.appendChild(d);
+      d.addEventListener("click", function (e) { if (e.target === d || e.target.closest("[data-close]")) d.close(); });
+    }
+    var m = p.more, row = function (label, text) { return text ? '<div class="more-row"><span class="eyebrow">' + label + '</span><p>' + esc(text) + '</p></div>' : ""; };
+    d.innerHTML = '<div class="more-box">' +
+      (p.image ? '<div class="pic loaded more-pic"><img src="' + u(p.image) + '" alt="' + esc(p.name) + '"></div>' : "") +
+      '<div class="more-body"><div class="more-head"><h3 id="more-title">' + esc(p.name) + '</h3>' +
+      '<button class="btn small" type="button" data-close aria-label="Close">Close</button></div>' +
+      row("Why we recommend it", m.why) + row("Best time", m.best) + row("Tips", m.tips) + row("Skip it if", m.skip) +
+      linkRow(p, true) + '</div></div>';
+    if (d.showModal) d.showModal(); else d.setAttribute("open", "");
+    var c = d.querySelector("[data-close]"); if (c) c.focus();
+  }
+  function wireMore(root) {
+    root.querySelectorAll("[data-more]").forEach(function (b) {
+      b.addEventListener("click", function () { openMore(moreList[+b.getAttribute("data-more")]); });
+    });
+  }
+
   function linkRow(p, small) {
     var c = "btn" + (small ? " small" : "");
     return '<div class="links">' +
@@ -206,7 +237,7 @@
         h.stays.map(function (s) {
           return '<article class="stay">' + pic({ image: s.image, wiki: s.wiki, credit: s.credit, name: s.name, type: "hotel", label: s.city }) +
             '<div class="body"><span class="eyebrow">' + esc(s.city) + ' · ' + esc(s.nights) + '</span><h3>' + esc(s.name) + '</h3>' +
-            (s.why ? '<p class="muted">' + esc(s.why) + '</p>' : "") + linkRow(s) + '</div></article>';
+            (s.why ? '<p class="muted">' + esc(s.why) + '</p>' : "") + linkRow(s) + moreButton(s) + '</div></article>';
         }).join("") + '</div></section>';
     }
 
@@ -227,7 +258,7 @@
           return '<div class="place">' + pic({ image: p.image, wiki: p.wiki, credit: p.credit, name: p.name, type: p.type }) +
             '<div class="body"><div class="top"><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
             (p.time ? '<span class="time">' + esc(p.time) + '</span>' : "") + '</div>' +
-            '<h4>' + esc(p.name) + '</h4>' + (p.note ? '<p class="note">' + esc(p.note) + '</p>' : "") + linkRow(p, true) + '</div></div>';
+            '<h4>' + esc(p.name) + '</h4>' + (p.note ? '<p class="note">' + esc(p.note) + '</p>' : "") + linkRow(p, true) + moreButton(p) + '</div></div>';
         }).join("") + '</div>';
       }
       if (mem.length) html += memoryGrid(mem);
@@ -606,10 +637,12 @@
     var id = (location.hash || "#home").slice(1);
     var root = document.getElementById("app");
     var h = holidays.filter(function (x) { return x.id === id; })[0];
+    moreList = [];
     if (id === "rebuild") { root.innerHTML = rebuildView(); wireRebuild(root); }
     else if (h) root.innerHTML = holidayView(h);
     else if (id.indexOf("-day") > 0 && holidays.some(function (x) { return id.indexOf(x.id + "-day") === 0; })) return;
     else root.innerHTML = homeView();
+    wireMore(root);
     var lockBtn = root.querySelector('[data-action="lock"]');
     if (lockBtn) lockBtn.addEventListener("click", function () { HolidayAlbum.lock(); });
     wirePics(root);

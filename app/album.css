@@ -232,3 +232,18 @@ footer { border-top: 1px solid var(--line); padding-block: 22px 40px; font-size:
 .walk { display: grid; gap: 4px; font-size: 14px; background: var(--paper); border-radius: 10px; padding: 10px 12px; }
 .walk b { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--maple); margin-right: 8px; }
 .walk-total { margin-top: 10px; font-size: 14px; }
+
+/* "Why we recommend it" pop-up */
+.btn.why { justify-self: start; border-color: var(--maple); color: var(--maple); margin-top: 6px; }
+.place .body .why, .stay .body .why { margin-top: 8px; }
+dialog.more { border: 0; padding: 0; background: transparent; max-width: min(640px, calc(100vw - 24px)); width: 100%; max-height: calc(100dvh - 24px); color: var(--ink); }
+dialog.more::backdrop { background: rgba(8, 11, 22, .6); }
+.more-box { background: var(--surface); border-radius: calc(var(--radius) + 4px); overflow: auto; max-height: calc(100dvh - 24px); box-shadow: var(--shadow); }
+.more-pic { aspect-ratio: 16 / 9; max-height: 34vh; width: 100%; }
+.more-body { padding: 18px 20px 22px; display: grid; gap: 14px; }
+.more-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.more-head h3 { font-size: 24px; }
+.more-row { display: grid; gap: 4px; }
+.more-row .eyebrow { color: var(--maple); }
+.more-row p { font-size: 15px; }
+@media (max-width: 560px) { dialog.more { max-width: calc(100vw - 16px); } .more-body { padding: 16px; } }
