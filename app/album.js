@@ -188,6 +188,7 @@
       (cities ? '<div><span class="eyebrow">Places we sleep</span><b>' + (h.stays || []).length + '</b></div>' : "") +
       '<div><span class="eyebrow">Stops</span><b>' + placeCount + '</b></div>' +
       '<div><span class="eyebrow">Photos</span><b>' + (h.memories || []).length + '</b></div></div>' +
+      (h.walkingTotal ? '<p class="muted walk-total">' + esc(h.walkingTotal) + '</p>' : "") +
       '<div class="summary">' + (h.travellers ? '<p class="eyebrow">' + esc(h.travellers) + '</p>' : "") + (h.summary ? '<p>' + esc(h.summary) + '</p>' : "") +
       ((h.links || []).length ? '<div class="links">' + h.links.map(function (l, i) { return '<a class="btn' + (i ? "" : " primary") + '" href="' + u(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.label) + '</a>'; }).join("") + '</div>' : "") + '</div>';
 
@@ -218,6 +219,7 @@
         '<div class="main"><h3>' + esc(d.title || d.city || "") + '</h3>' +
         '<div class="meta">' + (d.city ? '<span>In <b>' + esc(d.city) + '</b></span>' : "") + (d.sleep ? '<span>Sleep at <b>' + esc(d.sleep) + '</b></span>' : "") + '</div>' +
         (d.travel ? '<p class="travel">' + esc(d.travel) + '</p>' : "") +
+        (d.walk || d.ifTired ? '<div class="walk">' + (d.walk ? '<span><b>Walking</b> ' + esc(d.walk) + '</span>' : "") + (d.ifTired ? '<span><b>If tired</b> ' + esc(d.ifTired) + '</span>' : "") + '</div>' : "") +
         (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") +
         '</div></div>';
       if ((d.places || []).length) {

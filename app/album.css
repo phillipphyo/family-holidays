@@ -229,3 +229,6 @@ footer { border-top: 1px solid var(--line); padding-block: 22px 40px; font-size:
 .seal.big { width: 52px; height: 52px; font-size: 24px; border-radius: 50%; background: var(--maple); color: var(--paper); display: grid; place-items: center; font-family: var(--display); }
 .pic .credit { max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cover .pic .credit { top: 12px; right: 12px; bottom: auto; z-index: 2; }
+.walk { display: grid; gap: 4px; font-size: 14px; background: var(--paper); border-radius: 10px; padding: 10px 12px; }
+.walk b { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--maple); margin-right: 8px; }
+.walk-total { margin-top: 10px; font-size: 14px; }
