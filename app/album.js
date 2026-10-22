@@ -134,7 +134,7 @@
     if (pts.length < 2) return "";
     var ll = function (p) { return p.lat + "," + p.lon; };
     var mid = pts.slice(1, -1).slice(0, 8).map(ll).join("|");
-    return "https://www.google.com/maps/dir/?api=1&origin=" + ll(pts[0]) + "&destination=" + ll(pts[pts.length - 1]) + (mid ? "&waypoints=" + encodeURIComponent(mid) : "");
+    return "https://www.google.com/maps/dir/?api=1&origin=" + ll(pts[0]) + "&destination=" + ll(pts[pts.length - 1]) + (mid ? "&waypoints=" + encodeURIComponent(mid) : "") + "&travelmode=driving";
   }
 
   // ---------- page frame ----------
@@ -218,7 +218,7 @@
         '<div class="main"><h3>' + esc(d.title || d.city || "") + '</h3>' +
         '<div class="meta">' + (d.city ? '<span>In <b>' + esc(d.city) + '</b></span>' : "") + (d.sleep ? '<span>Sleep at <b>' + esc(d.sleep) + '</b></span>' : "") + '</div>' +
         (d.travel ? '<p class="travel">' + esc(d.travel) + '</p>' : "") +
-        (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s route in Google Maps</a></div>' : "") +
+        (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") +
         '</div></div>';
       if ((d.places || []).length) {
         html += '<div class="places">' + d.places.map(function (p) {
