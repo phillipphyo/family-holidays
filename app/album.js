@@ -124,11 +124,13 @@
   // "Why we recommend it" details open in a pop-up over the page.
   var moreList = [];
   function moreButton(p) {
-    if (!p.more) return "";
-    moreList.push(p);
-    return '<button class="btn small why" type="button" data-more="' + (moreList.length - 1) + '">Why we recommend it</button>';
+    var out = "";
+    if (p.more) { moreList.push({ p: p, kind: "why" }); out += '<button class="btn small why" type="button" data-more="' + (moreList.length - 1) + '">Why we recommend it</button>'; }
+    if (p.spots) { moreList.push({ p: p, kind: "spots" }); out += '<button class="btn small why spots" type="button" data-more="' + (moreList.length - 1) + '">Photo spots</button>'; }
+    return out ? '<div class="links">' + out + '</div>' : "";
   }
-  function openMore(p) {
+  function openMore(entry) {
+    var p = entry.p;
     var d = document.getElementById("more-dialog");
     if (!d) {
       d = document.createElement("dialog"); d.id = "more-dialog"; d.className = "more";
@@ -136,13 +138,17 @@
       document.body.appendChild(d);
       d.addEventListener("click", function (e) { if (e.target === d || e.target.closest("[data-close]")) d.close(); });
     }
-    var m = p.more, row = function (label, text) { return text ? '<div class="more-row"><span class="eyebrow">' + label + '</span><p>' + esc(text) + '</p></div>' : ""; };
+    var m = entry.kind === "spots" ? p.spots : p.more, row = function (label, text) { return text ? '<div class="more-row"><span class="eyebrow">' + label + '</span><p>' + esc(text) + '</p></div>' : ""; };
+    var credit = p.credit ? '<a class="credit" href="' + u(p.credit.url) + '" target="_blank" rel="noopener noreferrer">' + esc("Photo" + (p.credit.by ? ": " + p.credit.by : ": Wikipedia") + (p.credit.licence ? " · " + p.credit.licence : "")) + '</a>' : "";
+    var body = entry.kind === "spots"
+      ? row("Where to stand", m.spots) + row("Poses to try", m.poses) + row("Camera angle", m.angles) + row("Best light", m.light) + row("Crowd tips", m.crowds) +
+        '<div class="links"><a class="btn small" href="' + u("https://www.google.com/search?tbm=isch&q=" + q(p.name + " best photo spot")) + '" target="_blank" rel="noopener noreferrer">More example photos</a>' +
+        (m.tag ? '<a class="btn small" href="' + u("https://www.instagram.com/explore/tags/" + encodeURIComponent(m.tag) + "/") + '" target="_blank" rel="noopener noreferrer">#' + esc(m.tag) + ' on Instagram</a>' : "") + '</div>'
+      : row("Why we recommend it", m.why) + row("Best time", m.best) + row("Tips", m.tips) + row("Skip it if", m.skip) + linkRow(p, true);
     d.innerHTML = '<div class="more-box">' +
-      (p.image ? '<div class="pic loaded more-pic"><img src="' + u(p.image) + '" alt="' + esc(p.name) + '"></div>' : "") +
-      '<div class="more-body"><div class="more-head"><h3 id="more-title">' + esc(p.name) + '</h3>' +
-      '<button class="btn small" type="button" data-close aria-label="Close">Close</button></div>' +
-      row("Why we recommend it", m.why) + row("Best time", m.best) + row("Tips", m.tips) + row("Skip it if", m.skip) +
-      linkRow(p, true) + '</div></div>';
+      (p.image ? '<div class="pic loaded more-pic"><img src="' + u(p.image) + '" alt="' + esc(p.name) + '">' + credit + '</div>' : "") +
+      '<div class="more-body"><div class="more-head"><div><span class="eyebrow">' + (entry.kind === "spots" ? "Photo spots · sample picture above" : "Why we recommend it") + '</span><h3 id="more-title">' + esc(p.name) + '</h3></div>' +
+      '<button class="btn small" type="button" data-close aria-label="Close">Close</button></div>' + body + '</div></div>';
     if (d.showModal) d.showModal(); else d.setAttribute("open", "");
     var c = d.querySelector("[data-close]"); if (c) c.focus();
   }

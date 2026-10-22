@@ -247,3 +247,5 @@ dialog.more::backdrop { background: rgba(8, 11, 22, .6); }
 .more-row .eyebrow { color: var(--maple); }
 .more-row p { font-size: 15px; }
 @media (max-width: 560px) { dialog.more { max-width: calc(100vw - 16px); } .more-body { padding: 16px; } }
+.btn.why.spots { border-color: var(--indigo); color: var(--indigo); }
+.more-head .eyebrow { display: block; margin-bottom: 4px; }
