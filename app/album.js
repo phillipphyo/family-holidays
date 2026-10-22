@@ -68,19 +68,23 @@
   // it shows a patterned tile with the place name.
   var wikiCache = store("album-wiki-images") || {};
   var wikiWanted = {};
+  function creditText(cr, lead) {
+    return (lead || "Photo") + (cr.by ? " by " + cr.by : " from Wikipedia") + (cr.licence ? " · " + cr.licence : "");
+  }
   function pic(opts) {
     var src = opts.image || (opts.wiki && (window.ALBUM_IMAGES || {})[opts.wiki]) || "";
     var wiki = !src && opts.wiki ? opts.wiki : "";
     if (wiki && wikiCache[wiki]) src = wikiCache[wiki];
     if (wiki && !wikiCache[wiki]) wikiWanted[wiki] = true;
-    var credit = opts.wiki ? '<a class="credit" href="https://en.wikipedia.org/wiki/' + esc(encodeURIComponent(opts.wiki.replace(/ /g, "_"))) + '" target="_blank" rel="noopener noreferrer">Wikipedia</a>' : "";
-    return '<div class="pic' + (opts.cls ? " " + opts.cls : "") + '" style="--tone:' + tone(opts.type) + '" data-wiki="' + esc(wiki) + '">' +
-      '<div class="ph"><small>' + esc(opts.label || TYPE_LABEL[opts.type] || "") + '</small>' + esc(opts.name || "") + '</div>' +
-      (src ? '<img src="' + u(src) + '" alt="' + esc(opts.name || "") + '" loading="lazy">' : "") +
+    var credit = opts.wiki ? '<a class="credit" href="https://en.wikipedia.org/wiki/' + esc(encodeURIComponent(opts.wiki.replace(/ /g, "_"))) + '" target="_blank" rel="noopener noreferrer">Photo from Wikipedia</a>' : "";
+    var alt = opts.area || (opts.decorative ? "" : opts.name || "");
+    return '<div class="pic' + (opts.cls ? " " + opts.cls : "") + '" style="--tone:' + tone(opts.type) + '" data-wiki="' + esc(wiki) + '" data-area="' + esc(opts.area || "") + '">' +
+      '<div class="ph" aria-hidden="true"><small>' + esc(opts.label || TYPE_LABEL[opts.type] || "") + '</small>' + esc(opts.name || "") + '</div>' +
+      (src ? '<img src="' + u(src) + '" alt="' + esc(alt) + '" loading="lazy">' : "") +
+      (opts.area ? '<span class="pic-tag" aria-hidden="true">' + esc(opts.area) + '</span>' : "") +
       (src && !opts.image && opts.wiki && !opts.inLink ? credit : "") +
-      (opts.credit && opts.inLink ? '<span class="credit">' + esc("Photo" + (opts.credit.by ? ": " + opts.credit.by : ": Wikipedia") + (opts.credit.licence ? " · " + opts.credit.licence : "")) + '</span>' : "") +
-      (opts.credit && !opts.inLink ? '<a class="credit" href="' + u(opts.credit.url) + '" target="_blank" rel="noopener noreferrer" title="Who took this photo">' +
-        esc("Photo" + (opts.credit.by ? ": " + opts.credit.by : ": Wikipedia") + (opts.credit.licence ? " · " + opts.credit.licence : "")) + '</a>' : "") + '</div>';
+      (opts.credit && opts.inLink ? '<span class="credit">' + esc(creditText(opts.credit)) + '</span>' : "") +
+      (opts.credit && !opts.inLink ? '<a class="credit" href="' + u(opts.credit.url) + '" target="_blank" rel="noopener noreferrer" title="Who took this photo">' + esc(creditText(opts.credit)) + '</a>' : "") + '</div>';
   }
   function wirePics(root) {
     root.querySelectorAll(".pic img").forEach(function (img) {
@@ -111,46 +115,87 @@
         var t = box.getAttribute("data-wiki");
         if (!t || !wikiCache[t] || box.querySelector("img") || box.closest("a")) return;
         var img = new Image();
-        img.alt = t; img.loading = "lazy";
+        img.alt = box.getAttribute("data-area") || t; img.loading = "lazy";
         img.onload = function () { box.classList.add("loaded"); };
         img.onerror = function () { img.remove(); };
         img.src = safeUrl(wikiCache[t]);
         box.appendChild(img);
-        box.insertAdjacentHTML("beforeend", '<a class="credit" href="https://en.wikipedia.org/wiki/' + encodeURIComponent(t.replace(/ /g, "_")) + '" target="_blank" rel="noopener noreferrer">Wikipedia</a>');
+        box.insertAdjacentHTML("beforeend", '<a class="credit" href="https://en.wikipedia.org/wiki/' + encodeURIComponent(t.replace(/ /g, "_")) + '" target="_blank" rel="noopener noreferrer">Photo from Wikipedia</a>');
       });
     }).catch(function () { /* No internet or blocked: the patterned tiles stay. */ });
   }
 
-  // "Why we recommend it" details open in a pop-up over the page.
+  // "Why we picked it" and "Photo spots" open in a pop-up over the page.
   var moreList = [];
-  function moreButton(p) {
+  function moreButton(p, city) {
     var out = "";
-    if (p.more) { moreList.push({ p: p, kind: "why" }); out += '<button class="btn small why" type="button" data-more="' + (moreList.length - 1) + '">Why we recommend it</button>'; }
-    if (p.spots) { moreList.push({ p: p, kind: "spots" }); out += '<button class="btn small why spots" type="button" data-more="' + (moreList.length - 1) + '">Photo spots</button>'; }
-    return out ? '<div class="links">' + out + '</div>' : "";
+    if (p.more) { moreList.push({ p: p, kind: "why", city: city }); out += '<button class="more-btn why" type="button" aria-haspopup="dialog" data-more="' + (moreList.length - 1) + '"><span aria-hidden="true">✦</span>Why we picked it</button>'; }
+    if (p.spots) { moreList.push({ p: p, kind: "spots", city: city }); out += '<button class="more-btn spots" type="button" aria-haspopup="dialog" data-more="' + (moreList.length - 1) + '"><span aria-hidden="true">◎</span>Photo spots</button>'; }
+    return out ? '<div class="more-bar">' + out + '</div>' : "";
+  }
+  function closeMore(d) {
+    if (!d.open || d.classList.contains("closing")) return;
+    d.inert = true;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { d.close(); return; }
+    d.classList.add("closing");
+    setTimeout(function () { d.close(); }, 180);
+  }
+  function moreDialog() {
+    var d = document.getElementById("more-dialog");
+    if (d) return d;
+    d = document.createElement("dialog"); d.id = "more-dialog"; d.className = "more";
+    d.setAttribute("aria-labelledby", "more-title");
+    d.setAttribute("aria-describedby", "more-lead");
+    document.body.appendChild(d);
+    d.addEventListener("click", function (e) { if (e.target === d || e.target.closest("[data-close]")) closeMore(d); });
+    d.addEventListener("cancel", function (e) { e.preventDefault(); closeMore(d); });
+    d.addEventListener("close", function () {
+      d.classList.remove("closing"); d.inert = false;
+      document.documentElement.classList.remove("more-open");
+      if (d._opener && d._opener.isConnected) d._opener.focus();
+    });
+    return d;
   }
   function openMore(entry) {
-    var p = entry.p;
-    var d = document.getElementById("more-dialog");
-    if (!d) {
-      d = document.createElement("dialog"); d.id = "more-dialog"; d.className = "more";
-      d.setAttribute("aria-labelledby", "more-title");
-      document.body.appendChild(d);
-      d.addEventListener("click", function (e) { if (e.target === d || e.target.closest("[data-close]")) d.close(); });
+    var p = entry.p, spots = entry.kind === "spots", d = moreDialog();
+    d._opener = document.activeElement;
+    var m = spots ? p.spots : p.more, hotel = !!(p.nights || p.type === "hotel");
+    var row = function (label, text, cls) { return text ? '<div class="more-row' + (cls ? " " + cls : "") + '"><h3 class="more-label">' + label + '</h3><p>' + esc(text) + '</p></div>' : ""; };
+    // A hotel shows a photo here only when it is the hotel itself, never an area view.
+    var img = "", cr = null;
+    if (spots && m.image) { img = m.image; cr = m.credit; }
+    else if (!hotel || p.hotelPhoto) {
+      img = p.image || (p.wiki && ((window.ALBUM_IMAGES || {})[p.wiki] || wikiCache[p.wiki])) || "";
+      cr = p.image ? p.credit : null;
     }
-    var m = entry.kind === "spots" ? p.spots : p.more, row = function (label, text) { return text ? '<div class="more-row"><span class="eyebrow">' + label + '</span><p>' + esc(text) + '</p></div>' : ""; };
-    var credit = p.credit ? '<a class="credit" href="' + u(p.credit.url) + '" target="_blank" rel="noopener noreferrer">' + esc("Photo" + (p.credit.by ? ": " + p.credit.by : ": Wikipedia") + (p.credit.licence ? " · " + p.credit.licence : "")) + '</a>' : "";
-    var body = entry.kind === "spots"
-      ? row("Where to stand", m.spots) + row("Poses to try", m.poses) + row("Camera angle", m.angles) + row("Best light", m.light) + row("Crowd tips", m.crowds) +
-        '<div class="links"><a class="btn small" href="' + u("https://www.google.com/search?tbm=isch&q=" + q(p.name + " best photo spot")) + '" target="_blank" rel="noopener noreferrer">More example photos</a>' +
-        (m.tag ? '<a class="btn small" href="' + u("https://www.instagram.com/explore/tags/" + encodeURIComponent(m.tag) + "/") + '" target="_blank" rel="noopener noreferrer">#' + esc(m.tag) + ' on Instagram</a>' : "") + '</div>'
-      : row("Why we recommend it", m.why) + row("Best time", m.best) + row("Tips", m.tips) + row("Skip it if", m.skip) + linkRow(p, true);
-    d.innerHTML = '<div class="more-box">' +
-      (p.image ? '<div class="pic loaded more-pic"><img src="' + u(p.image) + '" alt="' + esc(p.name) + '">' + credit + '</div>' : "") +
-      '<div class="more-body"><div class="more-head"><div><span class="eyebrow">' + (entry.kind === "spots" ? "Photo spots · sample picture above" : "Why we recommend it") + '</span><h3 id="more-title">' + esc(p.name) + '</h3></div>' +
-      '<button class="btn small" type="button" data-close aria-label="Close">Close</button></div>' + body + '</div></div>';
+    var credit = !img ? "" : cr ? '<a class="credit" href="' + u(cr.url) + '" target="_blank" rel="noopener noreferrer">' + esc(creditText(cr, spots && m.image ? "Example photo" : "Photo")) + '</a>'
+      : p.wiki ? '<a class="credit" href="https://en.wikipedia.org/wiki/' + esc(encodeURIComponent(p.wiki.replace(/ /g, "_"))) + '" target="_blank" rel="noopener noreferrer">Photo from Wikipedia</a>' : "";
+    var where = (p.nights ? [p.city, p.nights] : [p.city || entry.city, TYPE_LABEL[p.type]]).filter(Boolean).join(" · ");
+    var note = hotel && !img ? '<span class="more-note">No free photo of this hotel yet. Tap Photos below to see it.</span>' : "";
+    var lead = function (label, text) { return text ? '<div class="more-row first">' + (label ? '<h3 class="more-label">' + label + '</h3>' : "") + '<p class="more-lead" id="more-lead">' + esc(text) + '</p></div>' : ""; };
+    var body = spots
+      ? lead("Where to stand", m.spots) + row("Poses to try", m.poses) + row("Camera angle", m.angles) + row("Best light", m.light) + row("Beat the crowds", m.crowds)
+      : lead("", m.why) + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + row("Skip it if", m.skip, "skip");
+    var foot = spots
+      ? '<div class="links seg"><a class="btn" href="' + u("https://www.google.com/search?tbm=isch&q=" + q(p.name + " best photo spot")) + '" target="_blank" rel="noopener noreferrer">More example photos</a>' +
+        (m.tag ? '<a class="btn" href="' + u("https://www.instagram.com/explore/tags/" + encodeURIComponent(m.tag) + "/") + '" target="_blank" rel="noopener noreferrer">#' + esc(m.tag) + ' on Instagram</a>' : "") + '</div>'
+      : linkRow(p, { primaryPhotos: !!note }) + infoLink(p);
+    d.innerHTML = '<div class="more-box' + (spots ? " is-spots" : "") + '">' +
+      '<button class="more-close" type="button" data-close aria-label="Close"><span aria-hidden="true">✕</span></button>' +
+      '<div class="more-scroll"><header class="more-hero' + (img ? "" : " no-pic") + '" style="--tone:' + tone(p.type || "hotel") + '">' +
+        (img ? '<img src="' + u(img) + '" alt="' + esc(spots && m.image ? "Example photo taken at " + p.name : p.name) + '">' : "") + credit +
+        '<div class="more-title"><span class="more-kicker">' + (spots ? "Photo spots" : "Why we picked it") + '</span><h2 id="more-title">' + esc(p.name) + '</h2>' +
+        (where ? '<span class="more-where">' + esc(where) + '</span>' : "") + note + '</div></header>' +
+      '<div class="more-body">' + body + '</div></div><footer class="more-foot">' + foot + '</footer></div>';
+    var hi = d.querySelector(".more-hero img");
+    if (hi) hi.addEventListener("error", function () {
+      var h = hi.parentNode; h.classList.add("no-pic"); hi.remove();
+      var c = h.querySelector(".credit"); if (c) c.remove();
+    });
+    document.documentElement.classList.add("more-open");
     if (d.showModal) d.showModal(); else d.setAttribute("open", "");
-    var c = d.querySelector("[data-close]"); if (c) c.focus();
+    d.querySelector(".more-scroll").scrollTop = 0;
+    d.querySelector("[data-close]").focus();
   }
   function wireMore(root) {
     root.querySelectorAll("[data-more]").forEach(function (b) {
@@ -158,13 +203,16 @@
     });
   }
 
-  function linkRow(p, small) {
-    var c = "btn" + (small ? " small" : "");
-    return '<div class="links">' +
-      '<a class="' + c + '" href="' + u(photosUrl(p)) + '" target="_blank" rel="noopener noreferrer">Photos</a>' +
-      '<a class="' + c + '" href="' + u(videosUrl(p)) + '" target="_blank" rel="noopener noreferrer">Videos</a>' +
-      '<a class="' + c + '" href="' + u(mapUrl(p)) + '" target="_blank" rel="noopener noreferrer">Map pin</a>' +
-      (p.infoUrl ? '<a class="' + c + '" href="' + u(p.infoUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(p.infoLabel || "More info") + '</a>' : "") + '</div>';
+  // Photos | Videos | Map as one joined bar. primaryPhotos fills the Photos cell.
+  function linkRow(p, opts) {
+    var ext = '" target="_blank" rel="noopener noreferrer">';
+    return '<div class="links seg">' +
+      '<a class="btn' + (opts && opts.primaryPhotos ? " is-primary" : "") + '" href="' + u(photosUrl(p)) + ext + 'Photos</a>' +
+      '<a class="btn" href="' + u(videosUrl(p)) + ext + 'Videos</a>' +
+      '<a class="btn" href="' + u(mapUrl(p)) + ext + 'Map</a></div>';
+  }
+  function infoLink(p) {
+    return p.infoUrl ? '<a class="info-link" href="' + u(p.infoUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(p.infoLabel || "More info") + ' <span aria-hidden="true">↗</span></a>' : "";
   }
   function dayRouteUrl(day) {
     var pts = (day.places || []).filter(function (p) { return p.lat != null && !p.noRoute; });
@@ -183,7 +231,7 @@
       '<a href="#rebuild"' + (active === "rebuild" ? ' aria-current="page"' : "") + '>Rebuild from photos</a>' +
       (unlockedKey ? '<button class="btn small" type="button" data-action="lock">Lock</button>' : "") +
       '</nav></div></header><main class="wrap">' + inner + '</main>' +
-      '<footer class="wrap">Pictures marked Wikipedia come from that place\'s Wikipedia page. Our own photos are kept inside the locked holiday files.</footer>';
+      '<footer class="wrap">Each photo credit links to where the picture came from. Our own photos are kept inside the locked holiday files.</footer>';
   }
 
   // ---------- home ----------
@@ -224,8 +272,10 @@
       '<div><span class="eyebrow">Nights</span><b>' + nights + '</b></div>' +
       (cities ? '<div><span class="eyebrow">Places we sleep</span><b>' + (h.stays || []).length + '</b></div>' : "") +
       '<div><span class="eyebrow">Stops</span><b>' + placeCount + '</b></div>' +
-      '<div><span class="eyebrow">Photos</span><b>' + (h.memories || []).length + '</b></div></div>' +
+      ((h.memories || []).length ? '<div><span class="eyebrow">Photos</span><b>' + h.memories.length + '</b></div>' : "") + '</div>' +
       (h.walkingTotal ? '<p class="muted walk-total">' + esc(h.walkingTotal) + '</p>' : "") +
+      ((h.journeyTips || []).length ? '<div class="tipbox"><h4><span aria-hidden="true">🚆</span> Getting around, every day</h4><ul>' + h.journeyTips.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>' +
+        (h.journeyNote ? '<p class="muted">' + esc(h.journeyNote) + '</p>' : "") + '</div>' : "") +
       '<div class="summary">' + (h.travellers ? '<p class="eyebrow">' + esc(h.travellers) + '</p>' : "") + (h.summary ? '<p>' + esc(h.summary) + '</p>' : "") +
       ((h.links || []).length ? '<div class="links">' + h.links.map(function (l, i) { return '<a class="btn' + (i ? "" : " primary") + '" href="' + u(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.label) + '</a>'; }).join("") + '</div>' : "") + '</div>';
 
@@ -241,13 +291,13 @@
     if ((h.stays || []).length) {
       html += '<section><div class="section-head"><h2>Where we stay</h2><span class="eyebrow">And why we chose it</span></div><div class="stays">' +
         h.stays.map(function (s) {
-          return '<article class="stay">' + pic({ image: s.image, wiki: s.wiki, credit: s.credit, name: s.name, type: "hotel", label: s.city }) +
+          return '<article class="stay">' + pic({ image: s.image, wiki: s.wiki, credit: s.credit, name: s.name, type: "hotel", label: s.city, area: s.areaPhoto, decorative: true }) +
             '<div class="body"><span class="eyebrow">' + esc(s.city) + ' · ' + esc(s.nights) + '</span><h3>' + esc(s.name) + '</h3>' +
-            (s.why ? '<p class="muted">' + esc(s.why) + '</p>' : "") + linkRow(s) + moreButton(s) + '</div></article>';
+            (s.why ? '<p class="muted">' + esc(s.why) + '</p>' : "") + infoLink(s) + '<div class="card-actions">' + moreButton(s) + linkRow(s) + '</div></div></article>';
         }).join("") + '</div></section>';
     }
 
-    html += '<section><div class="section-head"><h2>Day by day</h2><span class="eyebrow">Tap Photos, Videos or Map pin on any stop</span></div>';
+    html += '<section><div class="section-head"><h2>Day by day</h2><span class="eyebrow">Each day, then its stops in order</span></div>';
     (h.days || []).forEach(function (d, i) {
       var dd = parseDate(d.date), route = dayRouteUrl(d), mem = byDate[d.date] || [];
       delete byDate[d.date];
@@ -257,14 +307,15 @@
         '<div class="meta">' + (d.city ? '<span>In <b>' + esc(d.city) + '</b></span>' : "") + (d.sleep ? '<span>Sleep at <b>' + esc(d.sleep) + '</b></span>' : "") + '</div>' +
         (d.travel ? '<p class="travel">' + esc(d.travel) + '</p>' : "") +
         (d.walk || d.ifTired ? '<div class="walk">' + (d.walk ? '<span><b>Walking</b> ' + esc(d.walk) + '</span>' : "") + (d.ifTired ? '<span><b>If tired</b> ' + esc(d.ifTired) + '</span>' : "") + '</div>' : "") +
+        journeyList(d.journeys) +
         (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") +
         '</div></div>';
       if ((d.places || []).length) {
         html += '<div class="places">' + d.places.map(function (p) {
-          return '<div class="place">' + pic({ image: p.image, wiki: p.wiki, credit: p.credit, name: p.name, type: p.type }) +
+          return '<div class="place">' + pic({ image: p.image, wiki: p.wiki, credit: p.credit, name: p.name, type: p.type, area: p.areaPhoto, decorative: true }) +
             '<div class="body"><div class="top"><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
             (p.time ? '<span class="time">' + esc(p.time) + '</span>' : "") + '</div>' +
-            '<h4>' + esc(p.name) + '</h4>' + (p.note ? '<p class="note">' + esc(p.note) + '</p>' : "") + linkRow(p, true) + moreButton(p) + '</div></div>';
+            '<h4>' + esc(p.name) + '</h4>' + (p.note ? '<p class="note">' + esc(p.note) + '</p>' : "") + infoLink(p) + '<div class="card-actions">' + moreButton(p, d.city) + linkRow(p) + '</div></div></div>';
         }).join("") + '</div>';
       }
       if (mem.length) html += memoryGrid(mem);
@@ -290,6 +341,14 @@
         '<p>After the trip, open <a href="#rebuild">Rebuild from photos</a>, choose "Add to: ' + esc(h.title) + '" and pick your photos. Each photo goes under the day it was taken, next to the nearest stop.</p></div></section>';
     }
     return frame(h.id, html);
+  }
+  // Each ride as "how: time, how often, cost", with the part before the first colon in bold.
+  function journeyList(list) {
+    if (!(list || []).length) return "";
+    return '<div class="journeys"><h4><span aria-hidden="true">🚆</span> Journeys</h4><ul>' + list.map(function (j) {
+      var i = j.indexOf(": ");
+      return '<li>' + (i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j)) + '</li>';
+    }).join("") + '</ul></div>';
   }
   function memoryGrid(list) {
     return '<div class="memories">' + list.map(function (m) {
