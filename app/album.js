@@ -390,7 +390,7 @@
       '<p>Pick photos from a past trip. The album reads the date and the place saved inside each photo by your phone or camera, sorts the photos into days, and suggests a place name for each.</p></div>' +
       '<div class="steps"><div><b>Choose photos</b><p class="muted">Drop them in the box or tap to pick. They stay on your device. Nothing is uploaded.</p></div>' +
       '<div><b>Check the names</b><p class="muted">Each group is one stop on one day. Change any name or add a note.</p></div>' +
-      '<div><b>Save the holiday</b><p class="muted">Save one locked file that holds the trip and its photos, then put it in the website folder. The steps are shown below.</p></div></div>' +
+      '<div><b>Save the holiday</b><p class="muted">Save the locked holiday file with the trip and its photos (a big holiday saves as a few files), then put it in the website folder. The steps are shown below.</p></div></div>' +
       '<div class="form"><label for="rb-target">What are these photos for?<select id="rb-target">' + opts + '</select></label>' +
       '<label for="rb-title">Holiday name<input id="rb-title" type="text" placeholder="For example: Bangkok with Grandma" value="' + esc(rb.title || "") + '"></label>' +
       '<label for="rb-sub">Cities or one line about it<input id="rb-sub" type="text" placeholder="For example: Bangkok and Hua Hin" value="' + esc(rb.sub || "") + '"></label></div>' +
@@ -412,37 +412,70 @@
     drawGroups();
   }
 
+  // Read photos a few at a time, so thousands of photos don't freeze the browser,
+  // and show how far along it is. Stop keeps the photos read so far.
   function addFiles(files) {
     var list = Array.prototype.slice.call(files || []).filter(function (f) { return /^image\//.test(f.type) || /\.(heic|heif|jpe?g|png|webp)$/i.test(f.name); });
-    if (!list.length) return;
+    if (!list.length || rb.busy) return;
     var out = document.getElementById("rb-out");
-    out.insertAdjacentHTML("afterbegin", '<p class="notice" id="rb-busy">Reading ' + list.length + ' photos…</p>');
-    Promise.all(list.map(readPhoto)).then(function (items) {
+    var total = list.length, done = 0, started = Date.now(), items = [], next = 0, running = 0;
+    var size = photoSize(rb.photos.length + total);
+    rb.busy = { stop: false };
+    out.insertAdjacentHTML("afterbegin", '<div class="notice busy" id="rb-busy" role="status" aria-live="polite"><div class="row"><span id="rb-busy-text">Reading ' + total + ' photos…</span>' +
+      '<button class="btn small" type="button" id="rb-stop">Stop and keep these</button></div><div class="bar-track" aria-hidden="true"><span id="rb-busy-bar"></span></div></div>');
+    document.getElementById("rb-stop").addEventListener("click", function () { if (rb.busy) rb.busy.stop = true; });
+    function show() {
+      var txt = document.getElementById("rb-busy-text"), bar = document.getElementById("rb-busy-bar");
+      if (!txt) return;
+      var left = done ? Math.round((Date.now() - started) / done * (total - done) / 1000) : 0;
+      txt.textContent = "Reading " + done + " of " + total + " photos" + (done > 5 && left > 5 ? ", about " + (left < 90 ? left + " seconds" : Math.round(left / 60) + " minutes") + " left" : "") + "…";
+      if (bar) bar.style.width = Math.round(done / total * 100) + "%";
+    }
+    function finish() {
+      rb.busy = null;
       rb.photos = rb.photos.concat(items).sort(function (a, b) { return a.when < b.when ? -1 : 1; });
       drawGroups();
-    });
+    }
+    function pump() {
+      if (rb.busy && rb.busy.stop) { if (!running) finish(); return; }
+      while (running < 3 && next < total) {
+        running++;
+        readPhoto(list[next++], size).then(function (item) {
+          items.push(item); running--; done++; show();
+          if (next >= total && !running) finish(); else setTimeout(pump, 0);
+        });
+      }
+    }
+    pump();
   }
+  // Smaller copies when there are many photos, so the holiday files stay a size GitHub accepts.
+  function photoSize(n) { return n > 1500 ? { max: 960, q: 0.68 } : n > 400 ? { max: 1200, q: 0.72 } : { max: 1400, q: 0.8 }; }
 
-  // Redraw each photo at a sensible size. Redrawing removes the hidden data
-  // inside the file (exact GPS place, phone model, and so on).
-  function shrinkPhoto(file) {
+  // Redraw each photo at a sensible size, plus a small preview. Redrawing removes
+  // the hidden data inside the file (exact GPS place, phone model, and so on).
+  function shrinkPhoto(file, size) {
     var url = URL.createObjectURL(file);
     return new Promise(function (resolve) {
       var img = new Image();
       img.onload = function () {
-        var max = 1400, w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, max / Math.max(w, h));
-        var c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
-        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url);
-        try { resolve(c.toDataURL("image/jpeg", 0.8)); } catch (e) { resolve(null); }
+        var w = img.naturalWidth, h = img.naturalHeight, draw = function (max, q) {
+          var k = Math.min(1, max / Math.max(w, h)), c = document.createElement("canvas");
+          c.width = Math.round(w * k); c.height = Math.round(h * k);
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          var s = c.toDataURL("image/jpeg", q); c.width = c.height = 0; return s;
+        };
+        var res = null;
+        try { res = { data: draw(size.max, size.q), thumb: draw(240, 0.7) }; } catch (e) { res = null; }
+        URL.revokeObjectURL(url); img.src = "";
+        resolve(res);
       };
       img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
       img.src = url;
     });
   }
 
-  function readPhoto(file) {
-    var item = { file: file, name: file.name, url: URL.createObjectURL(file), heic: /\.(heic|heif)$/i.test(file.name) || /hei[cf]/.test(file.type) };
+  function readPhoto(file, size) {
+    var item = { name: file.name, heic: /\.(heic|heif)$/i.test(file.name) || /hei[cf]/.test(file.type) };
     var lib = window.exifr;
     var parse = lib ? lib.parse(file, { gps: true, tiff: true, exif: true, pick: ["DateTimeOriginal", "CreateDate", "ModifyDate", "GPSLatitude", "GPSLongitude", "GPSLatitudeRef", "GPSLongitudeRef", "latitude", "longitude"] }).catch(function () { return null; }) : Promise.resolve(null);
     return parse.then(function (tags) {
@@ -450,11 +483,11 @@
       if (dt instanceof Date && !isNaN(dt)) { item.when = dt.toISOString(); item.date = iso(dt); item.time = String(dt.getHours()).padStart(2, "0") + ":" + String(dt.getMinutes()).padStart(2, "0"); }
       else { var d = new Date(file.lastModified || Date.now()); item.when = d.toISOString(); item.date = iso(d); item.guessDate = true; }
       if (tags && typeof tags.latitude === "number" && typeof tags.longitude === "number") { item.lat = +tags.latitude.toFixed(5); item.lon = +tags.longitude.toFixed(5); }
-      return item.heic ? null : shrinkPhoto(file);
-    }).then(function (data) {
-      item.data = data;
+      return item.heic ? null : shrinkPhoto(file, size);
+    }).then(function (res) {
+      if (res) { item.data = res.data; item.thumb = res.thumb; }
       return item;
-    });
+    }, function () { return item; });
   }
 
   // Group photos: same day, and within about 1 km of the group's first photo.
@@ -480,6 +513,7 @@
     return out;
   }
 
+  var SHOW_THUMBS = 24;
   function drawGroups() {
     var out = document.getElementById("rb-out");
     if (!out) return;
@@ -503,10 +537,10 @@
       html += '<div class="group"><div class="head"><input type="text" id="rb-name-' + i + '" data-key="' + esc(g.key) + '" class="rb-name" value="' + esc(rb.names[g.key] || "") + '" placeholder="Place name" aria-label="Place name">' +
         '<span class="tag">' + esc(g.suggest.how) + (g.lat != null ? ' · <a href="https://www.google.com/maps/search/?api=1&query=' + g.lat + ',' + g.lon + '" target="_blank" rel="noopener noreferrer">see on map</a>' : "") + '</span></div>' +
         '<input type="text" id="rb-note-' + i + '" data-key="' + esc(g.key) + '" class="rb-note" value="' + esc(rb.notes[g.key] || "") + '" placeholder="A note, for example: Ice cream by the river" aria-label="Note">' +
-        '<div class="thumbs">' + g.photos.map(function (p) {
-          return '<div>' + (p.heic ? '<div class="pic"><div class="ph"><small>iPhone photo</small>' + esc(p.name) + '</div></div>' : '<div class="pic loaded"><img src="' + p.url + '" alt="' + esc(p.name) + '"></div>') +
+        '<div class="thumbs">' + g.photos.slice(0, SHOW_THUMBS).map(function (p) {
+          return '<div>' + (p.thumb ? '<div class="pic loaded"><img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy"></div>' : '<div class="pic"><div class="ph"><small>' + (p.heic ? "iPhone photo" : "Can't show") + '</small>' + esc(p.name) + '</div></div>') +
             '<span class="tag">' + esc(p.time || "") + ' ' + esc(p.name) + '</span></div>';
-        }).join("") + '</div></div>';
+        }).join("") + '</div>' + (g.photos.length > SHOW_THUMBS ? '<p class="tag">and ' + (g.photos.length - SHOW_THUMBS) + ' more photos in this group, all included</p>' : "") + '</div>';
     });
     html += '<section style="margin-top:36px"><div class="section-head"><h2>Save it to the album</h2></div>' +
       '<div class="steps" id="rb-save-steps"></div>' +
@@ -519,17 +553,28 @@
     out.querySelector("#rb-lookup").addEventListener("click", function () { lookupOnline(gs); });
     out.querySelector("#rb-save").addEventListener("click", function () {
       var msg = document.getElementById("rb-copy-msg");
-      if (!rb.fileText) { msg.textContent = "Still locking the file. Try again in a moment."; return; }
-      var a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob([rb.fileText], { type: "text/javascript" }));
-      a.download = rb.fileName; document.body.appendChild(a); a.click(); a.remove();
-      msg.textContent = "Saved " + rb.fileName + " to your Downloads folder.";
+      buildFiles(msg).then(function (files) {
+        files.forEach(function (f, i) {
+          setTimeout(function () {
+            var a = document.createElement("a");
+            a.href = URL.createObjectURL(new Blob([f.text], { type: "text/javascript" }));
+            a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000);
+          }, i * 1500);
+        });
+        msg.textContent = files.length === 1 ? "Saved " + files[0].name + " to your Downloads folder."
+          : "Saving " + files.length + " files to your Downloads folder. If the browser asks, allow it to download multiple files.";
+      }, function () { msg.textContent = "This browser could not lock the file. Open the album from the website (https) and try again."; });
     });
     out.querySelector("#rb-copy").addEventListener("click", function () {
       var ta = document.getElementById("rb-file"), msg = document.getElementById("rb-copy-msg");
-      var done = function () { msg.textContent = "Copied. Paste it into Notepad and save it as described above."; };
-      try { navigator.clipboard.writeText(rb.fileText || ta.value).then(done, function () { ta.select(); msg.textContent = "Press Ctrl+C (or Cmd+C) to copy the selected text."; }); }
-      catch (e) { ta.select(); msg.textContent = "Press Ctrl+C (or Cmd+C) to copy the selected text."; }
+      buildFiles(msg).then(function (files) {
+        if (files.length > 1 || files[0].text.length > 1500000) { msg.textContent = "Too big to copy. Use Save holiday file instead."; return; }
+        ta.value = files[0].text;
+        var done = function () { msg.textContent = "Copied. Paste it into Notepad and save it as described above."; };
+        try { navigator.clipboard.writeText(files[0].text).then(done, function () { ta.select(); msg.textContent = "Press Ctrl+C (or Cmd+C) to copy the selected text."; }); }
+        catch (e) { ta.select(); msg.textContent = "Press Ctrl+C (or Cmd+C) to copy the selected text."; }
+      }, function () { msg.textContent = "This browser could not lock the file. Open the album from the website (https) and try again."; });
     });
     refreshFile();
   }
@@ -567,7 +612,7 @@
     var gs = groups();
     var target = holidays.filter(function (h) { return h.id === rb.target; })[0];
     var first = rb.photos[0].date, last = rb.photos[rb.photos.length - 1].date;
-    var id = target ? target.id : slug((rb.title || "holiday") + "-" + first.slice(0, 4));
+    var id = target ? target.id : slug((rb.title || "holiday") + (String(rb.title || "").indexOf(first.slice(0, 4)) >= 0 ? "" : "-" + first.slice(0, 4)));
     var folder = "photos/" + id + "/";
     var memories = [];
     gs.forEach(function (g) {
@@ -584,7 +629,7 @@
     var hol, isNew = !target;
     if (target) {
       // The whole holiday again, with the new photos added (same file name replaces the old one).
-      hol = JSON.parse(JSON.stringify(target));
+      hol = Object.assign({}, target, { memories: target.memories.slice() });
       var have = {};
       hol.memories.forEach(function (m) { have[m.date + "|" + (m.file || m.image)] = true; });
       memories.forEach(function (m) { if (!have[m.date + "|" + m.file]) hol.memories.push(m); });
@@ -608,21 +653,41 @@
         cover: { image: memories[0] ? memories[0].image : "" }, summary: "", days: days, memories: memories
       };
     }
+    // Big holidays are split into parts of about 30 MB of photos (about 40 MB once locked), well under GitHub's 100 MB limit.
+    var parts = [[]], size = 0, LIMIT = 30 * 1048576;
+    hol.memories.forEach(function (m) {
+      var n = (m.image || "").length;
+      if (size + n > LIMIT && parts[parts.length - 1].length) { parts.push([]); size = 0; }
+      parts[parts.length - 1].push(m); size += n;
+    });
+    var names = parts.map(function (x, i) { return i ? id + ".photos-" + (i + 1) + ".js" : id + ".js"; });
+    rb.plan = { hol: hol, parts: parts, names: names, id: id };
+    rb.built = null;
+    var listLine = names.map(function (n) { return '"' + esc(n) + '",'; }).join("</code> <code>");
     var skipped = rb.photos.filter(function (p) { return !p.data; }).length;
-    steps.innerHTML = '<div><b>Save the holiday file</b><p class="muted">Press <b>Save holiday file</b> below. Your photos are inside it, locked with your passkey, with their hidden phone data removed.' +
-      (skipped ? ' ' + skipped + ' iPhone HEIC photos could not be added. Change them to JPG first.' : '') + '</p></div>' +
-      '<div><b>Put it in the website</b><p class="muted">Move the saved file into the <code>holidays</code> folder as <code>' + esc(id) + '.js</code>' + (isNew ? '' : ', replacing the old one') + '.</p></div>' +
-      (isNew ? '<div><b>Add it to the list</b><p class="muted">Open <code>holidays/list.js</code> and add <code>"' + esc(id) + '.js",</code> on a new line. Then open index.html.</p></div>'
-             : '<div><b>Open the album</b><p class="muted">Open index.html again. Each photo now shows under its day.</p></div>') +
-      '<div><b>Or ask Claude</b><p class="muted">Send Claude the saved file, and it will put it in the album for you.</p></div>';
-    var mine = ++refreshSeq;
-    ta.value = "Locking the holiday file…";
-    lockHoliday(hol, unlockedKey).then(function (box) {
-      if (mine !== refreshSeq) return;
-      var text = "/* " + hol.title + ". Holiday file made by Rebuild from photos on " + today() + ". Locked with the album passkey. Save as holidays/" + id + ".js */\nHolidayAlbum.addLocked(" + JSON.stringify(box) + ");\n";
-      rb.fileText = text; rb.fileName = id + ".js";
-      ta.value = text.length < 1500000 ? text : "The file is " + Math.round(text.length / 1048576) + " MB, too big to show here. Use Save holiday file.";
-    }, function () { ta.value = "This browser could not lock the file. Open the album from the website (https) and try again."; });
+    steps.innerHTML = '<div><b>Save the holiday ' + (names.length > 1 ? names.length + ' files' : 'file') + '</b><p class="muted">Press <b>Save holiday file</b> below. Your photos are inside, locked with your passkey, with their hidden phone data removed.' +
+      (names.length > 1 ? ' There are ' + hol.memories.length + ' photos, so they are split into ' + names.length + ' files.' : '') +
+      (skipped ? ' ' + skipped + ' photos could not be added (iPhone HEIC photos, or files the browser could not open). Change them to JPG first.' : '') + '</p></div>' +
+      '<div><b>Put it in the website</b><p class="muted">Move the saved ' + (names.length > 1 ? 'files' : 'file') + ' into the <code>holidays</code> folder' + (isNew ? '' : ', replacing the old ones') + ': <code>' + names.map(esc).join('</code>, <code>') + '</code>.</p></div>' +
+      '<div><b>Add it to the list</b><p class="muted">Open <code>holidays/list.js</code> and add <code>' + listLine + '</code>' + (isNew ? '' : ' (any names not there yet)') + '. Then open index.html.</p></div>' +
+      '<div><b>Or ask Claude</b><p class="muted">Send Claude the saved ' + (names.length > 1 ? 'files' : 'file') + ', and it will put them in the album for you.</p></div>';
+    ta.value = hol.memories.length + " photos ready. Press Save holiday file to lock them with your passkey and save.";
+  }
+  // Lock each part with the passkey, one after another, showing progress.
+  function buildFiles(msg) {
+    var plan = rb.plan;
+    if (!plan) return Promise.reject();
+    if (rb.built && rb.built.plan === plan) return Promise.resolve(rb.built.files);
+    var files = [], stamp = today();
+    return plan.parts.reduce(function (chain, mems, i) {
+      return chain.then(function () {
+        if (msg) msg.textContent = "Locking " + (plan.parts.length > 1 ? "file " + (i + 1) + " of " + plan.parts.length : "the holiday file") + "…";
+        var body = i ? { partOf: plan.id, part: i + 1, memories: mems } : Object.assign({}, plan.hol, { memories: mems, photoParts: plan.parts.length });
+        return lockHoliday(body, unlockedKey).then(function (box) {
+          files.push({ name: plan.names[i], text: "/* " + plan.hol.title + (i ? ", photos part " + (i + 1) : "") + ". Holiday file made by Rebuild from photos on " + stamp + ". Locked with the album passkey. Save as holidays/" + plan.names[i] + " */\nHolidayAlbum.addLocked(" + JSON.stringify(box) + ");\n" });
+        });
+      });
+    }, Promise.resolve()).then(function () { rb.built = { plan: plan, files: files }; return files; });
   }
   var refreshSeq = 0;
 
@@ -698,8 +763,21 @@
   var begun = false;
 
   // ---------- start ----------
+  // Photo part files (holiday.photos-2.js and on) join their holiday; a repeated photo is kept once.
+  var photoParts = [];
+  function mergeParts() {
+    photoParts.splice(0).forEach(function (part) {
+      var h = holidays.filter(function (x) { return x.id === part.partOf; })[0];
+      if (!h) return;
+      var have = {};
+      h.memories.forEach(function (m) { have[m.date + "|" + (m.file || m.image)] = true; });
+      (part.memories || []).forEach(function (m) { if (!have[m.date + "|" + (m.file || m.image)]) h.memories.push(m); });
+      h.memories.sort(function (a, b) { return (a.date + (a.time || "")) < (b.date + (b.time || "")) ? -1 : 1; });
+    });
+  }
   function render() {
     var id = (location.hash || "#home").slice(1);
+    mergeParts();
     var root = document.getElementById("app");
     var h = holidays.filter(function (x) { return x.id === id; })[0];
     moreList = [];
@@ -716,7 +794,10 @@
   }
 
   window.HolidayAlbum = {
-    add: function (h) { h.cover = h.cover || {}; h.memories = h.memories || []; holidays.push(h); },
+    add: function (h) {
+      if (h.partOf) { photoParts.push(h); return; }
+      h.cover = h.cover || {}; h.memories = h.memories || []; holidays.push(h);
+    },
     addLocked: function (box) { locked.push(box); },
     lock: function () { forgetPass(); location.hash = "#home"; location.reload(); },
     start: function () {

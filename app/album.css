@@ -390,3 +390,8 @@ dialog.more::backdrop { background: rgba(8, 11, 22, .72); }
   dialog.more.closing .more-box { animation: more-out .18s ease-in forwards; }
   dialog.more.closing::backdrop { animation: fade-out .18s ease-in forwards; }
 }
+.notice.busy { display: grid; gap: 10px; }
+.notice.busy .row { justify-content: space-between; }
+.bar-track { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar-track span { display: block; height: 100%; width: 0; background: var(--indigo); border-radius: inherit; transition: width .3s; }
+.memories figure, .thumbs > div { content-visibility: auto; contain-intrinsic-size: auto 200px; }
