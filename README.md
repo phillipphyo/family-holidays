@@ -39,7 +39,13 @@ The plain (unlocked) copies of the holiday files are kept outside this repositor
 
 Thousands of photos are fine. The page reads them a few at a time and shows how far along it is, with a Stop button that keeps the photos read so far. A big holiday is saved as a few files (for example `europe-2022.js`, `europe-2022.photos-2.js`), each well under GitHub's 100 MB limit. Put all of them in `holidays/` and list all of them in `holidays/list.js`.
 
-To add photos to a holiday that is already in the album (for example after the Japan trip), choose "Add to: Japan in autumn" at the top.
+At the top, say what the photos are for. **A trip already in the album** matches each photo to the stop planned for that day (for example Fushimi Inari on Day 2). **A past trip with no plan** builds the days, stops and route from where and when each photo was taken.
+
+### Videos
+
+- Every video (MP4 or MOV) gets a still picture in its day and stop.
+- Tick **Keep a 20-second clip** on your favourites. The clip is made when you save and plays inside the album.
+- Optional: put the full videos on YouTube as **Unlisted** (YouTube app or studio.youtube.com), then paste each link under its video, or paste them all at once in **Paste all your YouTube links**. Tapping the still in the album then plays the full video. Private videos will not play in the album.
 
 Good to know:
 
@@ -55,6 +61,8 @@ Each stop shows a photo from Wikimedia Commons or Wikipedia, labelled with who t
 
 - Holiday files are encrypted (AES-GCM, key made from the passkey with PBKDF2-SHA256, 600,000 rounds).
 - The page only runs its own scripts (a Content Security Policy blocks everything else), opens outside links without passing on where you came from, and asks search engines not to list it (`robots.txt` and a no-index tag).
+- The only outside site the album may show inside the page is youtube-nocookie.com, and only after you tap play on a video. Google then sees the viewer's internet address and which video was played.
+- YouTube videos are kept by YouTube, not the album. The passkey hides the links, but anyone given an Unlisted link can watch it. YouTube also keeps the original file, with where and when it was filmed. Deleting a video on YouTube breaks the full video, not the still or the clip.
 - "Remember on this device" keeps the passkey in that browser until you press Lock. Use it only on your own devices.
 
 The photo reader is [exifr](https://github.com/MikeKovarik/exifr) (MIT licence), saved in `app/`.

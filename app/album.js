@@ -43,6 +43,25 @@
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   // Only allow web links, embedded pictures and files inside this website.
   function safeMedia(v) { return /^data:video\/(webm|mp4);base64,/i.test(String(v || "")) ? v : ""; }
+  // YouTube links: only a checked 11-character video id is ever kept or put into a player address.
+  var YT_RE = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:[^#\s]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?=$|[?&#\/\s])/i;
+  function ytToken(s) { s = String(s || ""); var m = s.match(/https?:\/\/\S+/i) || s.match(/(?:www\.|m\.|youtu)\S*\/\S+/i); return m ? m[0] : ""; }
+  function ytId(s) {
+    var t = ytToken(s);
+    if (!t || /^(?:https?:\/\/)?(?:www\.)?google\.[a-z.]+\/url/i.test(t)) return "";
+    var m = t.match(YT_RE); return m ? m[1] : "";
+  }
+  function ytStart(s) { var m = String(s || "").match(/[?&#](?:t|start)=(\d+)s?(?:$|[&#])/); return m ? Math.min(86400, parseInt(m[1], 10)) : 0; }
+  function okYt(id) { return /^[A-Za-z0-9_-]{11}$/.test(String(id || "")); }
+  function ytWatch(id) { return "https://www.youtube.com/watch?v=" + id; }
+  function ytKind(s) {
+    s = String(s || "").trim();
+    if (!s) return "empty";
+    if (ytId(s)) return "ok";
+    if (/youtu/i.test(s) && /[?&]list=/.test(s)) return "playlist";
+    return "bad";
+  }
+  function canClip() { return !!(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream); }
   function safeUrl(u) { u = String(u == null ? "" : u).trim(); return /^(https:\/\/|data:image\/(jpeg|png|webp|gif);base64,|blob:)/i.test(u) || /^[\w.\-\/%]+$/.test(u) ? u : "#"; }
   function u(x) { return esc(safeUrl(x)); }
   function q(s) { return encodeURIComponent(s).replace(/%20/g, "+"); }
@@ -362,15 +381,49 @@
       return '<li>' + (i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j)) + '</li>';
     }).join("") + '</ul></div>';
   }
+  // The YouTube player only appears after a tap, one at a time, built from the checked video id.
+  var ytOpen = null;
+  function closeYt(refocus) {
+    if (!ytOpen) return;
+    var o = ytOpen; ytOpen = null;
+    o.box.replaceWith(o.was); o.fig.classList.remove("playing");
+    if (refocus && o.btn.isConnected) o.btn.focus();
+  }
+  function openYt(btn) {
+    closeYt(false);
+    var id = btn.getAttribute("data-yt"), start = parseInt(btn.getAttribute("data-start"), 10) || 0;
+    if (!okYt(id)) return;
+    var fig = btn.closest("figure"); if (!fig) return;
+    fig.querySelectorAll("video").forEach(function (v) { v.pause(); });
+    document.querySelectorAll("figure.vid video").forEach(function (v) { v.pause(); });
+    var was = btn.classList.contains("yt-full") ? (fig.querySelector(".pic") || btn) : btn;
+    var box = document.createElement("div"); box.className = "yt-box";
+    var f = document.createElement("iframe");
+    f.src = "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&rel=0&playsinline=1" + (start ? "&start=" + start : "");
+    f.title = "Video: " + (btn.getAttribute("data-title") || "");
+    f.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+    f.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen"; f.allowFullscreen = true;
+    var close = document.createElement("button"); close.type = "button"; close.className = "btn small yt-close"; close.textContent = "Close video";
+    close.addEventListener("click", function () { closeYt(true); });
+    box.appendChild(f); box.appendChild(close);
+    was.replaceWith(box); fig.classList.add("playing");
+    ytOpen = { box: box, was: was, fig: fig, btn: btn };
+    f.focus();
+  }
   // A day's photos, under a small heading for each stop when they were matched to stops.
   function memoryGrid(list) {
     var fig = function (m) {
       if (m.kind === "video") {
+        var yid = okYt(m.yt) ? m.yt : ytId(m.link), st = Math.max(0, Math.floor(+m.ytStart || 0)) || 0;
+        var label = m.caption || m.place || "video", data = ' data-yt="' + esc(yid) + '" data-start="' + st + '" data-title="' + esc(label) + '"';
         var cap = '<figcaption>' + esc(m.caption || m.place || "") + (m.duration ? ' · ' + mmss(m.duration) + ' video' : ' · video') +
-          (m.link ? ' · <a href="' + u(m.link) + '" target="_blank" rel="noopener noreferrer">Full video</a>' : "") + '</figcaption>';
-        if (m.clip) return '<figure class="vid"><div class="pic loaded"><video controls playsinline preload="none" poster="' + u(m.image) + '" src="' + safeMedia(m.clip) + '"></video></div>' + cap + '</figure>';
-        var inner = '<div class="pic loaded vid-poster"><img src="' + u(m.image) + '" alt="Video at ' + esc(m.place || "") + '" loading="lazy"><span class="vid-badge" aria-hidden="true">▶ ' + mmss(m.duration) + '</span></div>';
-        return '<figure class="vid">' + (m.link ? '<a href="' + u(m.link) + '" target="_blank" rel="noopener noreferrer" aria-label="Open the full video">' + inner + '</a>' : inner) + cap + '</figure>';
+          (yid ? ' · <a href="' + u(ytWatch(yid)) + '" target="_blank" rel="noopener noreferrer">Open on YouTube</a><span class="yt-note">If the video will not play, open it on YouTube.</span>'
+            : m.link ? ' · <a href="' + u(m.link) + '" target="_blank" rel="noopener noreferrer">Full video</a>' : "") + '</figcaption>';
+        var still = '<img src="' + u(m.image) + '" alt="" loading="lazy"><span class="vid-badge" aria-hidden="true">▶ ' + mmss(m.duration) + '</span>';
+        if (m.clip) return '<figure class="vid"><div class="pic loaded"><video controls playsinline preload="none" poster="' + u(m.image) + '" src="' + safeMedia(m.clip) + '" aria-label="20-second clip: ' + esc(label) + '"></video></div>' +
+          (yid ? '<button type="button" class="btn small yt-full"' + data + '>Watch full video</button>' : "") + cap + '</figure>';
+        if (yid) return '<figure class="vid"><button type="button" class="pic loaded vid-poster yt-play"' + data + ' aria-label="Play video: ' + esc(label) + (m.duration ? ", " + mmss(m.duration) : "") + '">' + still + '</button>' + cap + '</figure>';
+        return '<figure class="vid"><div class="pic loaded vid-poster">' + still.replace('alt=""', 'alt="Video at ' + esc(m.place || "") + '"') + '</div>' + cap + '</figure>';
       }
       return '<figure>' + pic({ image: m.image, name: m.place || m.caption || "", type: "sight" }) +
         '<figcaption>' + esc(m.caption || m.place || "") + (m.place && m.caption ? " · " + esc(m.place) : "") + '</figcaption></figure>';
@@ -782,6 +835,49 @@
   }
   function mmss(sec) { sec = Math.round(sec || 0); return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
   // Videos in a stop: a still picture each, a tick for a 20-second clip, and a box for a link to the full video.
+  function ytStatus(link) {
+    var k = ytKind(link);
+    if (k === "ok") return '<span class="ok"><span aria-hidden="true">✓</span> YouTube video found · <a href="' + u(ytWatch(ytId(link))) + '" target="_blank" rel="noopener noreferrer">Open to check</a></span>';
+    if (k === "playlist") return '<span class="bad">That looks like a playlist. Please open one video and copy its link.</span>';
+    if (k === "bad") return '<span class="bad"><span aria-hidden="true">✗</span> This does not look like a YouTube link. It should start with youtube.com or youtu.be</span>';
+    return "";
+  }
+  // Paste many links at once: a link naming a file (IMG_4821) goes to that video, the rest go in order.
+  function matchLinks(text, newestFirst) {
+    var vids = rb.photos.filter(function (p) { return p.video; });
+    var links = String(text || "").split(/\r?\n/).map(function (l) { return { line: l, id: ytId(l) }; }).filter(function (l) { return l.id; });
+    var rest = [];
+    links.forEach(function (l) {
+      var hit = vids.filter(function (p) { var base = p.name.replace(/\.[^.]+$/, "").toLowerCase(); return base.length > 2 && l.line.toLowerCase().indexOf(base) >= 0 && !p._matched; })[0];
+      if (hit) { hit.link = ytWatch(l.id) + (ytStart(l.line) ? "&t=" + ytStart(l.line) : ""); hit._matched = true; } else rest.push(l);
+    });
+    if (newestFirst) rest.reverse();
+    var open = vids.filter(function (p) { return !p._matched && !ytId(p.link); });
+    rest.forEach(function (l, n) { if (open[n]) open[n].link = ytWatch(l.id) + (ytStart(l.line) ? "&t=" + ytStart(l.line) : ""); });
+    vids.forEach(function (p) { delete p._matched; });
+    var used = links.length - Math.max(0, rest.length - open.length);
+    return !links.length ? "No YouTube links found in what you pasted."
+      : used < links.length ? "You pasted " + links.length + " links for " + vids.length + " videos. The first " + used + " were matched; the rest were left out."
+      : rest.length < open.length ? "You pasted " + links.length + " links. " + (open.length - rest.length) + " videos still have no link."
+      : "All " + links.length + " links matched. Check each still picture below shows the right video.";
+  }
+  function ytHelpPanel() {
+    var n = rb.photos.filter(function (p) { return p.video; }).length;
+    if (!n) return "";
+    return '<div class="rb-yt-help card-ish"><h3>Your ' + (n === 1 ? "video" : n + " videos") + '</h3>' +
+      '<p>For each video you can: 1. Keep a short 20-second clip inside the album. 2. Add a YouTube link so the whole video can be watched. Upload the videos to YouTube first, then paste the links here.</p>' +
+      '<details><summary>How do I put my videos on YouTube?</summary><ol>' +
+      '<li>On a computer go to studio.youtube.com and press Create, then Upload videos. On a phone open the YouTube app and press +.</li>' +
+      '<li>For visibility choose <b>Unlisted</b> (only people with the link can watch). Private videos will not play in the album. Never choose Public.</li>' +
+      '<li>For audience choose "No, it\'s not made for kids". In Studio, turn comments off, keep "Allow embedding" ticked and leave "Video location" empty.</li>' +
+      '<li>Keep titles plain, with no names. If you keep the phone\'s file name (for example IMG_4821) as the title, the album can match links by name.</li>' +
+      '<li>Wait for "Processing finished", then open each video, press Share and Copy, and paste the link here.</li>' +
+      '<li>Ask the girls before their videos go on YouTube. Anyone given an Unlisted link can watch it and pass it on, and YouTube keeps the original file with where and when it was filmed.</li></ol></details>' +
+      '<label class="rb-yt-label" for="rb-yt-all">Paste all your YouTube links (one per line)</label>' +
+      '<textarea id="rb-yt-all" rows="4" spellcheck="false" autocapitalize="off" placeholder="https://youtu.be/…"></textarea>' +
+      '<div class="row"><label class="check"><input type="checkbox" id="rb-yt-newest"> My list is newest first</label><button class="btn" type="button" id="rb-yt-match">Match links</button></div>' +
+      '<p class="tag" id="rb-yt-msg" role="status" aria-live="polite"></p></div>';
+  }
   function videoRow(g) {
     var vids = g.photos.filter(function (p) { return p.video; });
     if (!vids.length) return "";
@@ -789,9 +885,12 @@
       var i = rb.photos.indexOf(p);
       return '<div class="rb-video"><div class="pic loaded vid-poster">' + (p.thumb ? '<img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy">' : "") +
         '<span class="vid-badge" aria-hidden="true">▶ ' + mmss(p.duration) + '</span></div>' +
-        '<label class="check"><input type="checkbox" class="rb-fav" data-i="' + i + '"' + (p.fav ? " checked" : "") + '> Keep a 20-second clip' + (p.clip ? " (made)" : "") + '</label>' +
-        '<input type="text" class="rb-link" data-i="' + i + '" value="' + esc(p.link || "") + '" placeholder="Link to the full video (optional)" aria-label="Link to the full video ' + esc(p.name) + '">' +
-        '<span class="tag">' + esc(p.time || "") + ' ' + esc(p.name) + '</span></div>';
+        '<span class="tag">' + esc(p.time || "") + ' ' + esc(p.name) + '</span>' +
+        (canClip() ? '<label class="check"><input type="checkbox" class="rb-fav" data-i="' + i + '"' + (p.fav ? " checked" : "") + '> Keep a 20-second clip' + (p.clip ? " · Clip ready" : "") + '</label><span class="tag">Plays inside the album, no YouTube needed</span>'
+          : '<label class="check"><input type="checkbox" disabled> Keep a 20-second clip</label><span class="tag">Not possible in this browser</span>') +
+        '<label class="rb-yt-label" for="rb-link-' + i + '">YouTube link (optional)</label>' +
+        '<input type="text" class="rb-link" id="rb-link-' + i + '" data-i="' + i + '" value="' + esc(p.link || "") + '" placeholder="Paste the link from YouTube" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="rb-yt-st-' + i + '"' + (ytKind(p.link) === "bad" || ytKind(p.link) === "playlist" ? ' aria-invalid="true"' : "") + '>' +
+        '<span class="rb-yt-st" id="rb-yt-st-' + i + '" role="status" aria-live="polite">' + ytStatus(p.link) + '</span></div>';
     }).join("") + '</div>';
   }
   function drawGroups() {
@@ -810,7 +909,7 @@
       withGps + ' have a place saved in them. ' + (guessed ? guessed + ' have no date inside, so we used the file date, which may be wrong. ' : "") +
       (T ? gs.filter(function (g) { return g.anchor; }).reduce(function (n, g) { return n + g.photos.length; }, 0) + ' matched a planned stop.' : gs.length + ' stops over ' + Object.keys(gs.reduce(function (o, g) { o[g.date] = 1; return o; }, {})).length + ' days.') + '</div>' +
       '<div class="row" style="margin-top:12px"><button class="btn" id="rb-lookup" type="button">Look up place names online</button>' +
-      '<button class="btn" id="rb-clear" type="button">Start again</button><span class="tag" id="rb-lookup-msg"></span></div>';
+      '<button class="btn" id="rb-clear" type="button">Start again</button><span class="tag" id="rb-lookup-msg"></span></div>' + ytHelpPanel();
     var cities = T ? {} : dayCities(gs);
     if (T) {
       (T.days || []).forEach(function (d, n) {
@@ -839,7 +938,24 @@
       '<div class="row" style="margin-top:10px"><button class="btn primary" type="button" id="rb-save">Save holiday file</button><button class="btn" type="button" id="rb-copy">Copy holiday file</button><span class="tag" id="rb-copy-msg"></span></div></section>';
     out.innerHTML = html;
     out.querySelectorAll(".rb-fav").forEach(function (el) { el.addEventListener("change", function () { rb.photos[+el.dataset.i].fav = el.checked; refreshFile(); }); });
-    out.querySelectorAll(".rb-link").forEach(function (el) { el.addEventListener("input", function () { rb.photos[+el.dataset.i].link = el.value.trim(); refreshFile(); }); });
+    var linkTimer = null, linkEl = null;
+    var flushLink = function () {
+      clearTimeout(linkTimer); linkTimer = null; if (!linkEl) return;
+      var el = linkEl, p = rb.photos[+el.dataset.i], k = ytKind(p.link); linkEl = null;
+      var st = document.getElementById("rb-yt-st-" + el.dataset.i); if (st) st.innerHTML = ytStatus(p.link);
+      if (k === "bad" || k === "playlist") el.setAttribute("aria-invalid", "true"); else el.removeAttribute("aria-invalid");
+      refreshFile();
+    };
+    out.querySelectorAll(".rb-link").forEach(function (el) {
+      el.addEventListener("input", function () { rb.photos[+el.dataset.i].link = el.value.trim(); if (linkEl && linkEl !== el) flushLink(); linkEl = el; clearTimeout(linkTimer); linkTimer = setTimeout(flushLink, 300); });
+      el.addEventListener("change", flushLink); el.addEventListener("blur", flushLink);
+    });
+    var ytMatch = out.querySelector("#rb-yt-match");
+    if (ytMatch) ytMatch.addEventListener("click", function () {
+      var msg = matchLinks(out.querySelector("#rb-yt-all").value, out.querySelector("#rb-yt-newest").checked);
+      drawGroups(); refreshFile();
+      var m2 = document.getElementById("rb-yt-msg"); if (m2) m2.textContent = msg;
+    });
     var ob = out.querySelector("#rb-outside");
     if (ob) ob.addEventListener("change", function () { rb.skipOutside = !ob.checked; refreshFile(); });
     out.querySelectorAll(".rb-name").forEach(function (el) { el.addEventListener("input", function () { rb.names[el.dataset.key] = el.value; refreshFile(); }); });
@@ -847,6 +963,7 @@
     out.querySelector("#rb-clear").addEventListener("click", function () { rb.photos = []; rb.names = {}; rb.notes = {}; rb.online = {}; drawGroups(); });
     out.querySelector("#rb-lookup").addEventListener("click", function () { lookupOnline(gs); });
     out.querySelector("#rb-save").addEventListener("click", function () {
+      flushLink();
       var msg = document.getElementById("rb-copy-msg");
       buildFiles(msg).then(function (files) {
         files.forEach(function (f, i) {
@@ -862,6 +979,7 @@
       }, function () { msg.textContent = "This browser could not lock the file. Open the album from the website (https) and try again."; });
     });
     out.querySelector("#rb-copy").addEventListener("click", function () {
+      flushLink();
       var ta = document.getElementById("rb-file"), msg = document.getElementById("rb-copy-msg");
       buildFiles(msg).then(function (files) {
         if (files.length > 1 || files[0].text.length > 1500000) { msg.textContent = "Too big to copy. Use Save holiday file instead."; return; }
@@ -919,7 +1037,9 @@
         if (p.video) {
           m.kind = "video"; if (p.duration) m.duration = Math.round(p.duration);
           if (p.fav && p.clip) m.clip = p.clip;
-          if (/^https:\/\//i.test(p.link || "")) m.link = p.link;
+          var yid = ytId(p.link);
+          if (okYt(yid)) { m.yt = yid; var yst = ytStart(p.link); if (yst) m.ytStart = yst; m.link = ytWatch(yid); }
+          else if (/^https:\/\//i.test(p.link || "")) m.link = p.link;
         }
         if (rb.notes[g.key]) m.caption = rb.notes[g.key];
         if (p.time) m.time = p.time;
@@ -1099,7 +1219,13 @@
     });
   }
   function begin() {
-    if (!begun) { begun = true; window.addEventListener("hashchange", render); }
+    if (!begun) {
+      begun = true; window.addEventListener("hashchange", render);
+      document.getElementById("app").addEventListener("click", function (e) {
+        var b = e.target.closest && e.target.closest(".yt-play, .yt-full");
+        if (b) openYt(b);
+      });
+    }
     render();
   }
   var begun = false;
@@ -1118,6 +1244,7 @@
     });
   }
   function render() {
+    closeYt(false);
     var id = (location.hash || "#home").slice(1);
     mergeParts();
     var root = document.getElementById("app");
@@ -1141,7 +1268,8 @@
       h.cover = h.cover || {}; h.memories = h.memories || []; holidays.push(h);
     },
     addLocked: function (box) { locked.push(box); },
-    lock: function () { forgetPass(); location.hash = "#home"; location.reload(); },
+    _t: { ytId: ytId, ytStart: ytStart, okYt: okYt, ytKind: ytKind },
+    lock: function () { closeYt(false); forgetPass(); location.hash = "#home"; location.reload(); },
     start: function () {
       if (!locked.length) return begin();
       var pass = savedPass();
