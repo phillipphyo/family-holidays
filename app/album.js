@@ -27,12 +27,22 @@
     ["Auckland", -36.8485, 174.7633], ["Queenstown", -45.0312, 168.6626], ["London", 51.5072, -0.1276], ["Paris", 48.8566, 2.3522],
     ["Rome", 41.9028, 12.4964], ["Barcelona", 41.3874, 2.1686], ["Zurich", 47.3769, 8.5417], ["Amsterdam", 52.3676, 4.9041],
     ["Dubai", 25.2048, 55.2708], ["Istanbul", 41.0082, 28.9784], ["New York", 40.7128, -74.0060], ["Los Angeles", 34.0522, -118.2437],
-    ["San Francisco", 37.7749, -122.4194], ["Vancouver", 49.2827, -123.1207], ["Maldives", 3.2028, 73.2207], ["Delhi", 28.6139, 77.2090]
+    ["San Francisco", 37.7749, -122.4194], ["Vancouver", 49.2827, -123.1207], ["Maldives", 3.2028, 73.2207], ["Delhi", 28.6139, 77.2090],
+    ["Berlin", 52.5200, 13.4050], ["Munich", 48.1351, 11.5820], ["Frankfurt", 50.1109, 8.6821], ["Cologne", 50.9375, 6.9603], ["Hamburg", 53.5511, 9.9937],
+    ["Milan", 45.4642, 9.1900], ["Venice", 45.4408, 12.3155], ["Florence", 43.7696, 11.2558], ["Pisa", 43.7228, 10.4017], ["Naples", 40.8518, 14.2681],
+    ["Lake Como", 45.9937, 9.2575], ["Prague", 50.0755, 14.4378], ["Vienna", 48.2082, 16.3738], ["Salzburg", 47.8095, 13.0550], ["Hallstatt", 47.5622, 13.6493],
+    ["Innsbruck", 47.2692, 11.4041], ["Budapest", 47.4979, 19.0402], ["Krakow", 50.0647, 19.9450], ["Lucerne", 47.0502, 8.3093], ["Interlaken", 46.6863, 7.8632],
+    ["Zermatt", 46.0207, 7.7491], ["Geneva", 46.2044, 6.1432], ["Brussels", 50.8503, 4.3517], ["Bruges", 51.2093, 3.2247], ["Luxembourg", 49.6116, 6.1319],
+    ["Lisbon", 38.7223, -9.1393], ["Porto", 41.1579, -8.6291], ["Madrid", 40.4168, -3.7038], ["Seville", 37.3891, -5.9845], ["Nice", 43.7102, 7.2620],
+    ["Monaco", 43.7384, 7.4246], ["Lyon", 45.7640, 4.8357], ["Copenhagen", 55.6761, 12.5683], ["Stockholm", 59.3293, 18.0686], ["Oslo", 59.9139, 10.7522],
+    ["Edinburgh", 55.9533, -3.1883], ["Dublin", 53.3498, -6.2603], ["Athens", 37.9838, 23.7275], ["Santorini", 36.3932, 25.4615], ["Dubrovnik", 42.6507, 18.0944],
+    ["Reykjavik", 64.1466, -21.9426], ["Helsinki", 60.1699, 24.9384], ["Warsaw", 52.2297, 21.0122], ["Strasbourg", 48.5734, 7.7521], ["Heidelberg", 49.3988, 8.6724]
   ];
 
   // ---------- small helpers ----------
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   // Only allow web links, embedded pictures and files inside this website.
+  function safeMedia(v) { return /^data:video\/(webm|mp4);base64,/i.test(String(v || "")) ? v : ""; }
   function safeUrl(u) { u = String(u == null ? "" : u).trim(); return /^(https:\/\/|data:image\/(jpeg|png|webp|gif);base64,|blob:)/i.test(u) || /^[\w.\-\/%]+$/.test(u) ? u : "#"; }
   function u(x) { return esc(safeUrl(x)); }
   function q(s) { return encodeURIComponent(s).replace(/%20/g, "+"); }
@@ -310,11 +320,13 @@
         journeyList(d.journeys) +
         (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") +
         '</div></div>';
+      var shots = {};
+      mem.forEach(function (m) { if (m.stop) shots[m.stop] = (shots[m.stop] || 0) + 1; });
       if ((d.places || []).length) {
         html += '<div class="places">' + d.places.map(function (p) {
           return '<div class="place">' + pic({ image: p.image, wiki: p.wiki, credit: p.credit, name: p.name, type: p.type, area: p.areaPhoto, decorative: true }) +
             '<div class="body"><div class="top"><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
-            (p.time ? '<span class="time">' + esc(p.time) + '</span>' : "") + '</div>' +
+            (p.time ? '<span class="time">' + esc(p.time) + '</span>' : "") + (shots[p.name] ? '<span class="time">📷 ' + shots[p.name] + '</span>' : "") + '</div>' +
             '<h4>' + esc(p.name) + '</h4>' + (p.note ? '<p class="note">' + esc(p.note) + '</p>' : "") + infoLink(p) + '<div class="card-actions">' + moreButton(p, d.city) + linkRow(p) + '</div></div></div>';
         }).join("") + '</div>';
       }
@@ -350,15 +362,30 @@
       return '<li>' + (i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j)) + '</li>';
     }).join("") + '</ul></div>';
   }
+  // A day's photos, under a small heading for each stop when they were matched to stops.
   function memoryGrid(list) {
-    return '<div class="memories">' + list.map(function (m) {
+    var fig = function (m) {
+      if (m.kind === "video") {
+        var cap = '<figcaption>' + esc(m.caption || m.place || "") + (m.duration ? ' · ' + mmss(m.duration) + ' video' : ' · video') +
+          (m.link ? ' · <a href="' + u(m.link) + '" target="_blank" rel="noopener noreferrer">Full video</a>' : "") + '</figcaption>';
+        if (m.clip) return '<figure class="vid"><div class="pic loaded"><video controls playsinline preload="none" poster="' + u(m.image) + '" src="' + safeMedia(m.clip) + '"></video></div>' + cap + '</figure>';
+        var inner = '<div class="pic loaded vid-poster"><img src="' + u(m.image) + '" alt="Video at ' + esc(m.place || "") + '" loading="lazy"><span class="vid-badge" aria-hidden="true">▶ ' + mmss(m.duration) + '</span></div>';
+        return '<figure class="vid">' + (m.link ? '<a href="' + u(m.link) + '" target="_blank" rel="noopener noreferrer" aria-label="Open the full video">' + inner + '</a>' : inner) + cap + '</figure>';
+      }
       return '<figure>' + pic({ image: m.image, name: m.place || m.caption || "", type: "sight" }) +
         '<figcaption>' + esc(m.caption || m.place || "") + (m.place && m.caption ? " · " + esc(m.place) : "") + '</figcaption></figure>';
-    }).join("") + '</div>';
+    };
+    var order = [], by = {};
+    list.forEach(function (m) { var k = m.stop || m.place || ""; if (!by[k]) { by[k] = []; order.push(k); } by[k].push(m); });
+    if (order.length < 2 && !list.some(function (m) { return m.stop; })) return '<div class="memories">' + list.map(fig).join("") + '</div>';
+    return order.map(function (k) {
+      return '<div class="mem-group"><h4><span aria-hidden="true">📷</span> ' + esc(k || "Other photos") + ' <span class="muted">' + by[k].length + '</span></h4><div class="memories">' + by[k].map(fig).join("") + '</div></div>';
+    }).join("");
   }
 
+
   // ---------- rebuild from photos ----------
-  var rb = { photos: [], target: "new" };
+  var rb = { photos: [], mode: "", target: "" };
 
   function knownPlaces() {
     var list = [];
@@ -382,29 +409,55 @@
     return { name: "", how: "Place not known yet. Type a name, or use Look up place names." };
   }
 
+  function rbTarget() { return rb.mode === "add" ? holidays.filter(function (h) { return h.id === rb.target; })[0] || holidays[0] : null; }
   function rebuildView() {
-    var opts = '<option value="new">A new holiday</option>' + holidays.map(function (h) {
-      return '<option value="' + esc(h.id) + '"' + (rb.target === h.id ? " selected" : "") + '>Add to: ' + esc(h.title) + ' (' + esc(niceShort(h.start)) + ' to ' + esc(nice(h.end)) + ')</option>';
+    if (!rb.mode) rb.mode = "past";
+    if (rb.mode === "add" && !holidays.length) rb.mode = "past";
+    var add = rb.mode === "add", t = rbTarget();
+    var opts = holidays.map(function (h) {
+      return '<option value="' + esc(h.id) + '"' + (t && t.id === h.id ? " selected" : "") + '>' + esc(h.title) + ' (' + esc(niceShort(h.start)) + ' to ' + esc(nice(h.end)) + ')</option>';
     }).join("");
-    var html = '<div class="intro"><span class="eyebrow">Past holidays</span><h1>Rebuild a holiday from your photos</h1>' +
-      '<p>Pick photos from a past trip. The album reads the date and the place saved inside each photo by your phone or camera, sorts the photos into days, and suggests a place name for each.</p></div>' +
-      '<div class="steps"><div><b>Choose photos</b><p class="muted">Drop them in the box or tap to pick. They stay on your device. Nothing is uploaded.</p></div>' +
-      '<div><b>Check the names</b><p class="muted">Each group is one stop on one day. Change any name or add a note.</p></div>' +
-      '<div><b>Save the holiday</b><p class="muted">Save the locked holiday file with the trip and its photos (a big holiday saves as a few files), then put it in the website folder. The steps are shown below.</p></div></div>' +
-      '<div class="form"><label for="rb-target">What are these photos for?<select id="rb-target">' + opts + '</select></label>' +
-      '<label for="rb-title">Holiday name<input id="rb-title" type="text" placeholder="For example: Bangkok with Grandma" value="' + esc(rb.title || "") + '"></label>' +
-      '<label for="rb-sub">Cities or one line about it<input id="rb-sub" type="text" placeholder="For example: Bangkok and Hua Hin" value="' + esc(rb.sub || "") + '"></label></div>' +
-      '<label class="drop" id="rb-drop" for="rb-files"><b>Drop photos here, or tap to choose</b><span class="muted">JPG, PNG and iPhone HEIC photos. You can add more at any time.</span>' +
-      '<input id="rb-files" type="file" accept="image/*,.heic,.heif" multiple></label>' +
+    var choice = function (mode, title, text) {
+      return '<button type="button" class="rb-mode" role="radio" aria-checked="' + (rb.mode === mode) + '" data-mode="' + mode + '"' + (mode === "add" && !holidays.length ? " disabled" : "") + '>' +
+        '<span class="rb-dot" aria-hidden="true"></span><b>' + title + '</b><span class="muted">' + text + '</span></button>';
+    };
+    var html = '<div class="intro"><span class="eyebrow">Photos and memories</span><h1>Add your photos to the album</h1>' +
+      '<p>The album reads the date and the place saved inside each photo by your phone or camera, then puts every photo in the right day and place. Your photos stay on your device until you save.</p></div>' +
+      '<h2 class="rb-q" id="rb-q">What are these photos for?</h2>' +
+      '<div class="rb-modes" role="radiogroup" aria-labelledby="rb-q">' +
+      choice("add", "A trip already in the album", "For example, our Japan trip once we're back. Each photo is matched to the stop planned for that day, such as Fushimi Inari on Day 2.") +
+      choice("past", "A past trip with no plan", "For example, Europe 2022. The album builds the days, the stops and the route from where and when each photo was taken.") + '</div>' +
+      '<div class="form">' + (add
+        ? '<label for="rb-target">Which trip?<select id="rb-target">' + opts + '</select></label>'
+        : '<label for="rb-title">Holiday name<input id="rb-title" type="text" placeholder="For example: Europe 2022" value="' + esc(rb.title || "") + '"></label>' +
+          '<label for="rb-sub">Cities or one line about it<input id="rb-sub" type="text" placeholder="Left empty, the cities are filled in from the photos" value="' + esc(rb.sub || "") + '"></label>') + '</div>' +
+      '<div class="steps">' + (add
+        ? '<div><b>Choose photos</b><p class="muted">Pick every photo from the trip. Photos from before or after the trip dates are shown apart, and you choose whether to keep them.</p></div>' +
+          '<div><b>Check the matches</b><p class="muted">Each day lists its planned stops and how many photos landed at each. Photos taken somewhere else get their own group to name.</p></div>'
+        : '<div><b>Choose photos</b><p class="muted">Pick every photo from the trip. Thousands are fine. They stay on your device.</p></div>' +
+          '<div><b>Check the stops</b><p class="muted">Photos taken close together on the same day become one stop. Each day gets its city. Rename any stop or add a note.</p></div>') +
+      '<div><b>Save</b><p class="muted">Save the locked holiday file (a big holiday saves as a few files) and put it in the website folder. The steps are shown below.</p></div></div>' +
+      '<label class="drop" id="rb-drop" for="rb-files"><b>Drop photos here, or tap to choose</b><span class="muted">Photos (JPG, PNG, iPhone HEIC) and videos (MP4, MOV). You can add more at any time.</span>' +
+      '<input id="rb-files" type="file" accept="image/*,.heic,.heif,video/*,.mov,.mp4,.m4v" multiple></label>' +
       '<div id="rb-out"></div>';
     return frame("rebuild", html);
   }
 
   function wireRebuild(root) {
     var drop = root.querySelector("#rb-drop"), input = root.querySelector("#rb-files");
-    root.querySelector("#rb-target").addEventListener("change", function (e) { rb.target = e.target.value; drawGroups(); });
-    root.querySelector("#rb-title").addEventListener("input", function (e) { rb.title = e.target.value; refreshFile(); });
-    root.querySelector("#rb-sub").addEventListener("input", function (e) { rb.sub = e.target.value; refreshFile(); });
+    root.querySelectorAll(".rb-mode").forEach(function (b) {
+      b.addEventListener("click", function () {
+        if (rb.mode === b.dataset.mode) return;
+        rb.mode = b.dataset.mode; rb.names = {}; rb.online = {};
+        render();
+        var again = document.querySelector('.rb-mode[data-mode="' + rb.mode + '"]'); if (again) again.focus();
+      });
+    });
+    var tsel = root.querySelector("#rb-target");
+    if (tsel) { rb.target = tsel.value; tsel.addEventListener("change", function (e) { rb.target = e.target.value; rb.names = {}; drawGroups(); }); }
+    var ti = root.querySelector("#rb-title"), su = root.querySelector("#rb-sub");
+    if (ti) ti.addEventListener("input", function (e) { rb.title = e.target.value; refreshFile(); });
+    if (su) su.addEventListener("input", function (e) { rb.sub = e.target.value; refreshFile(); });
     input.addEventListener("change", function () { addFiles(input.files); input.value = ""; });
     ["dragenter", "dragover"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
     ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
@@ -415,11 +468,11 @@
   // Read photos a few at a time, so thousands of photos don't freeze the browser,
   // and show how far along it is. Stop keeps the photos read so far.
   function addFiles(files) {
-    var list = Array.prototype.slice.call(files || []).filter(function (f) { return /^image\//.test(f.type) || /\.(heic|heif|jpe?g|png|webp)$/i.test(f.name); });
+    var list = Array.prototype.slice.call(files || []).filter(function (f) { return /^image\//.test(f.type) || /\.(heic|heif|jpe?g|png|webp)$/i.test(f.name) || isVideo(f); });
     if (!list.length || rb.busy) return;
     var out = document.getElementById("rb-out");
     var total = list.length, done = 0, started = Date.now(), items = [], next = 0, running = 0;
-    var size = photoSize(rb.photos.length + total);
+    var size = photoSize(rb.photos.length + total), lanes = workerPool() ? pool.length : 3;
     rb.busy = { stop: false };
     out.insertAdjacentHTML("afterbegin", '<div class="notice busy" id="rb-busy" role="status" aria-live="polite"><div class="row"><span id="rb-busy-text">Reading ' + total + ' photos…</span>' +
       '<button class="btn small" type="button" id="rb-stop">Stop and keep these</button></div><div class="bar-track" aria-hidden="true"><span id="rb-busy-bar"></span></div></div>');
@@ -438,15 +491,160 @@
     }
     function pump() {
       if (rb.busy && rb.busy.stop) { if (!running) finish(); return; }
-      while (running < 3 && next < total) {
+      while (running < lanes && next < total) {
         running++;
-        readPhoto(list[next++], size).then(function (item) {
+        readAny(list[next++], size).then(function (item) {
           items.push(item); running--; done++; show();
           if (next >= total && !running) finish(); else setTimeout(pump, 0);
         });
       }
     }
     pump();
+  }
+  // ---------- videos ----------
+  // Phone videos keep their date and place in the "moov" part of the file (MP4 and MOV).
+  // We read just that part: the creation time, and the place written as "+48.8584+002.2945/".
+  function isVideo(f) { return /^video\//.test(f.type) || /\.(mp4|mov|m4v|webm|3gp)$/i.test(f.name); }
+  function videoMeta(file) {
+    var read = function (from, len) { return file.slice(from, from + len).arrayBuffer(); };
+    function walk(pos) {
+      if (pos + 8 > file.size) return Promise.resolve(null);
+      return read(pos, 16).then(function (b) {
+        var v = new DataView(b), size = v.getUint32(0), type = String.fromCharCode(v.getUint8(4), v.getUint8(5), v.getUint8(6), v.getUint8(7));
+        if (size === 1) size = v.getUint32(8) * 4294967296 + v.getUint32(12);
+        else if (size === 0) size = file.size - pos;
+        if (size < 8) return null;
+        if (type === "moov") return read(pos, Math.min(size, 16 * 1048576));
+        return walk(pos + size);
+      });
+    }
+    return walk(0).then(function (buf) {
+      if (!buf) return {};
+      var a = new Uint8Array(buf), out = {}, v = new DataView(buf);
+      for (var i = 4; i < a.length - 24; i++) {
+        if (!out.dt && a[i] === 0x6d && a[i + 1] === 0x76 && a[i + 2] === 0x68 && a[i + 3] === 0x64) { // "mvhd"
+          var ver = a[i + 4], secs = ver === 1 ? v.getUint32(i + 8) * 4294967296 + v.getUint32(i + 12) : v.getUint32(i + 8);
+          if (secs > 0) out.dt = (secs - 2082844800) * 1000;
+          var scale = ver === 1 ? v.getUint32(i + 24) : v.getUint32(i + 16), dur = ver === 1 ? v.getUint32(i + 28) * 4294967296 + v.getUint32(i + 32) : v.getUint32(i + 20);
+          if (scale) out.duration = dur / scale;
+        }
+      }
+      var text = new TextDecoder("latin1").decode(a), m = text.match(/([+-]\d{1,2}\.\d{2,})([+-]\d{1,3}\.\d{2,})/);
+      if (m) { out.lat = parseFloat(m[1]); out.lon = parseFloat(m[2]); }
+      var apple = text.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:?\d{2})/); // Apple's local creation date, best when present
+      if (apple) { var t = Date.parse(apple[1].replace(/([+-]\d{2})(\d{2})$/, "$1:$2")); if (!isNaN(t)) out.dt = t; }
+      return out;
+    }).catch(function () { return {}; });
+  }
+  // A still picture from about one second in, with the hidden data left behind.
+  function videoPoster(file) {
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(file), vid = document.createElement("video"), done = false;
+      var finish = function (res) { if (done) return; done = true; vid.removeAttribute("src"); vid.load(); URL.revokeObjectURL(url); resolve(res); };
+      vid.muted = true; vid.playsInline = true; vid.preload = "auto";
+      vid.onloadedmetadata = function () { vid.currentTime = Math.min(1, (vid.duration || 2) / 3); };
+      vid.onseeked = function () {
+        try {
+          var draw = function (max, q) {
+            var k = Math.min(1, max / Math.max(vid.videoWidth, vid.videoHeight)), c = document.createElement("canvas");
+            c.width = Math.round(vid.videoWidth * k); c.height = Math.round(vid.videoHeight * k);
+            c.getContext("2d").drawImage(vid, 0, 0, c.width, c.height);
+            var s = c.toDataURL("image/jpeg", q); c.width = c.height = 0; return s;
+          };
+          finish({ data: draw(960, 0.72), thumb: draw(240, 0.7), duration: vid.duration });
+        } catch (e) { finish(null); }
+      };
+      vid.onerror = function () { finish(null); };
+      setTimeout(function () { finish(null); }, 20000);
+      vid.src = url;
+    });
+  }
+  function readVideo(file) {
+    var item = { name: file.name, video: true, file: file };
+    return videoMeta(file).then(function (meta) {
+      var dt = meta.dt ? new Date(meta.dt) : null;
+      if (dt && !isNaN(dt)) { item.when = dt.toISOString(); item.date = iso(dt); item.time = String(dt.getHours()).padStart(2, "0") + ":" + String(dt.getMinutes()).padStart(2, "0"); }
+      else { var d = new Date(file.lastModified || Date.now()); item.when = d.toISOString(); item.date = iso(d); item.guessDate = true; }
+      if (meta.lat != null && Math.abs(meta.lat) <= 90 && Math.abs(meta.lon) <= 180) { item.lat = +meta.lat.toFixed(5); item.lon = +meta.lon.toFixed(5); }
+      return videoPoster(file);
+    }).then(function (res) {
+      if (res) { item.data = res.data; item.thumb = res.thumb; item.duration = res.duration; }
+      return item;
+    });
+  }
+  // A short clip (20 seconds, about 640 px) of a favourite video, made by playing it once
+  // silently in the background and recording a smaller copy. About 1 to 2 MB each.
+  function makeClip(file, seconds) {
+    return new Promise(function (resolve) {
+      if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return resolve(null);
+      var url = URL.createObjectURL(file), vid = document.createElement("video"), stop = null;
+      vid.playsInline = true; vid.preload = "auto"; vid.src = url;
+      var types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
+      var type = types.filter(function (t) { return MediaRecorder.isTypeSupported(t); })[0];
+      if (!type) { URL.revokeObjectURL(url); return resolve(null); }
+      vid.onloadedmetadata = function () {
+        var k = Math.min(1, 640 / Math.max(vid.videoWidth, vid.videoHeight)), c = document.createElement("canvas");
+        c.width = Math.round(vid.videoWidth * k / 2) * 2; c.height = Math.round(vid.videoHeight * k / 2) * 2;
+        var ctx = c.getContext("2d"), stream = c.captureStream(30);
+        try {
+          var ac = new (window.AudioContext || window.webkitAudioContext)(), src = ac.createMediaElementSource(vid), dest = ac.createMediaStreamDestination();
+          src.connect(dest); dest.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
+        } catch (e) { vid.muted = true; }
+        var rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 600000, audioBitsPerSecond: 64000 }), parts = [];
+        rec.ondataavailable = function (e) { if (e.data.size) parts.push(e.data); };
+        rec.onstop = function () {
+          URL.revokeObjectURL(url); vid.removeAttribute("src"); vid.load();
+          var blob = new Blob(parts, { type: type.split(";")[0] }), fr = new FileReader();
+          fr.onload = function () { resolve(fr.result); }; fr.onerror = function () { resolve(null); }; fr.readAsDataURL(blob);
+        };
+        var paint = function () { if (rec.state !== "recording") return; ctx.drawImage(vid, 0, 0, c.width, c.height); requestAnimationFrame(paint); };
+        stop = function () { if (rec.state === "recording") rec.stop(); vid.pause(); };
+        vid.onended = stop;
+        rec.start(1000);
+        vid.play().then(paint, function () { stop(); });
+        setTimeout(stop, Math.min(seconds, vid.duration || seconds) * 1000 + 300);
+      };
+      vid.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+    });
+  }
+
+  // Background helpers (web workers) read photos side by side without freezing the page.
+  // If the browser can't run them (old browser, or index.html opened as a file), the page reads them itself.
+  var pool = null, poolBroken = false, jobs = {}, jobSeq = 0;
+  function workerPool() {
+    if (pool || poolBroken) return pool;
+    if (!window.Worker || !window.OffscreenCanvas || !window.createImageBitmap || location.protocol === "file:") { poolBroken = true; return null; }
+    try {
+      var n = Math.max(2, Math.min(6, (navigator.hardwareConcurrency || 4) - 1));
+      pool = [];
+      for (var i = 0; i < n; i++) {
+        var w = new Worker("app/photo-worker.js");
+        w.busy = false;
+        w.onmessage = function (e) { var j = jobs[e.data.id]; delete jobs[e.data.id]; this.busy = false; if (j) j.done(e.data); };
+        w.onerror = function () { poolBroken = true; var me = this; Object.keys(jobs).forEach(function (k) { if (jobs[k].w === me) { var j = jobs[k]; delete jobs[k]; j.fail(); } }); };
+        pool.push(w);
+      }
+    } catch (e) { pool = null; poolBroken = true; }
+    return pool;
+  }
+  function readAny(file, size) {
+    if (isVideo(file)) return readVideo(file);
+    var free = !poolBroken && pool && pool.filter(function (w) { return !w.busy; })[0];
+    if (!free) return readPhoto(file, size);
+    var item = { name: file.name, heic: /\.(heic|heif)$/i.test(file.name) || /hei[cf]/.test(file.type) };
+    return new Promise(function (resolve) {
+      var id = ++jobSeq;
+      free.busy = true;
+      jobs[id] = { w: free, fail: function () { resolve(readPhoto(file, size)); }, done: function (r) {
+        var dt = r.dt != null ? new Date(r.dt) : null;
+        if (dt) { item.when = dt.toISOString(); item.date = iso(dt); item.time = String(dt.getHours()).padStart(2, "0") + ":" + String(dt.getMinutes()).padStart(2, "0"); }
+        else { var d = new Date(file.lastModified || Date.now()); item.when = d.toISOString(); item.date = iso(d); item.guessDate = true; }
+        if (r.lat != null) { item.lat = +r.lat.toFixed(5); item.lon = +r.lon.toFixed(5); }
+        if (r.data) { item.data = r.data; item.thumb = r.thumb; }
+        resolve(item);
+      } };
+      free.postMessage({ id: id, file: file, heic: item.heic, max: size.max, q: size.q });
+    });
   }
   // Smaller copies when there are many photos, so the holiday files stay a size GitHub accepts.
   function photoSize(n) { return n > 1500 ? { max: 960, q: 0.68 } : n > 400 ? { max: 1200, q: 0.72 } : { max: 1400, q: 0.8 }; }
@@ -490,19 +688,39 @@
     }, function () { return item; });
   }
 
-  // Group photos: same day, and within about 1 km of the group's first photo.
+  // Group photos into stops. Adding to a trip: a photo within 1.5 km of a stop planned that day
+  // (or 1 km of any stop on the trip) joins that stop. Everything else: same day, within about
+  // 1 km of the group's first photo.
+  function nearestStop(list, lat, lon, km) {
+    var best = null, bd = km;
+    list.forEach(function (s) { if (s.lat == null) return; var d = distKm(lat, lon, s.lat, s.lon); if (d < bd) { bd = d; best = s; } });
+    return best ? { stop: best, km: bd } : null;
+  }
   function groups() {
-    var out = [];
+    var out = [], T = rbTarget(), dayOf = {}, all = [];
+    if (T) {
+      (T.days || []).forEach(function (d, i) { dayOf[d.date] = { day: d, n: i + 1 }; (d.places || []).forEach(function (p) { all.push({ name: p.name, lat: p.lat, lon: p.lon, dayN: i + 1 }); }); });
+      (T.stays || []).forEach(function (s) { all.push({ name: s.name, lat: s.lat, lon: s.lon, stay: true }); });
+    }
     rb.photos.forEach(function (p) {
+      var info = T && dayOf[p.date], anchor = null, how = "";
+      if (T && p.lat != null) {
+        var m = info && nearestStop((info.day.places || []).map(function (x) { return { name: x.name, lat: x.lat, lon: x.lon }; }), p.lat, p.lon, 1.5);
+        if (m) { anchor = m.stop.name; how = "Planned stop for this day"; }
+        else {
+          m = nearestStop(all, p.lat, p.lon, 1);
+          if (m) { anchor = m.stop.name; how = m.stop.stay ? "At our hotel" : "Near a stop planned for Day " + m.stop.dayN; }
+        }
+      }
       var g = out.filter(function (g) {
         if (g.date !== p.date) return false;
+        if (anchor || g.anchor) return g.anchor === anchor;
         if (g.lat == null || p.lat == null) return g.lat == null && p.lat == null;
         return distKm(g.lat, g.lon, p.lat, p.lon) < 1;
       })[0];
       if (!g) {
-        g = { key: p.date + "|" + (p.lat != null ? p.lat.toFixed(2) + "," + p.lon.toFixed(2) : "none"), date: p.date, lat: p.lat, lon: p.lon, photos: [] };
-        var s = p.lat != null ? suggestPlace(p.lat, p.lon) : { name: "", how: "This photo has no place saved in it. Type where it was taken." };
-        g.suggest = s;
+        g = { key: p.date + "|" + (anchor ? "@" + anchor : p.lat != null ? p.lat.toFixed(2) + "," + p.lon.toFixed(2) : "none"), date: p.date, lat: p.lat, lon: p.lon, photos: [], anchor: anchor, inTrip: !T || !!info };
+        g.suggest = anchor ? { name: anchor, how: how } : p.lat != null ? suggestPlace(p.lat, p.lon) : { name: "", how: "No place saved in these photos. Type where they were taken." };
         out.push(g);
       }
       g.photos.push(p);
@@ -512,8 +730,54 @@
     out.forEach(function (g) { if (rb.names[g.key] == null) rb.names[g.key] = (rb.online && rb.online[g.key]) || g.suggest.name; });
     return out;
   }
+  // Rebuilding a past trip: the city for each day is the known city nearest to most of that day's photos.
+  function cityOf(lat, lon) {
+    var best = null, bd = 80;
+    GAZETTEER.forEach(function (c) { var d = distKm(lat, lon, c[1], c[2]); if (d < bd) { bd = d; best = c[0]; } });
+    return best;
+  }
+  function dayCities(gs) {
+    var votes = {};
+    gs.forEach(function (g) {
+      if (g.lat == null) return;
+      var c = cityOf(g.lat, g.lon); if (!c) return;
+      var v = votes[g.date] = votes[g.date] || {};
+      v[c] = (v[c] || 0) + g.photos.length;
+    });
+    var out = {};
+    Object.keys(votes).forEach(function (d) { out[d] = Object.keys(votes[d]).sort(function (a, b) { return votes[d][b] - votes[d][a]; })[0]; });
+    return out;
+  }
 
   var SHOW_THUMBS = 24;
+  function groupCard(g, i) {
+    var fixed = !!g.anchor;
+    return '<div class="group' + (fixed ? " matched" : "") + '"><div class="head">' +
+      (fixed ? '<h4 class="rb-stop"><span class="rb-pin" aria-hidden="true">✓</span>' + esc(g.anchor) + '</h4>'
+             : '<input type="text" id="rb-name-' + i + '" data-key="' + esc(g.key) + '" class="rb-name" value="' + esc(rb.names[g.key] || "") + '" placeholder="Place name" aria-label="Place name">') +
+      '<span class="tag">' + g.photos.length + (g.photos.length === 1 ? " photo · " : " photos · ") + esc(g.suggest.how) +
+      (g.lat != null ? ' · <a href="https://www.google.com/maps/search/?api=1&query=' + g.lat + ',' + g.lon + '" target="_blank" rel="noopener noreferrer">see on map</a>' : "") + '</span></div>' +
+      '<input type="text" id="rb-note-' + i + '" data-key="' + esc(g.key) + '" class="rb-note" value="' + esc(rb.notes[g.key] || "") + '" placeholder="A note, for example: Ice cream by the river" aria-label="Note for ' + esc(rb.names[g.key] || "this stop") + '">' +
+      videoRow(g) +
+      '<div class="thumbs">' + g.photos.filter(function (p) { return !p.video; }).slice(0, SHOW_THUMBS).map(function (p) {
+        return '<div>' + (p.thumb ? '<div class="pic loaded"><img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy"></div>' : '<div class="pic"><div class="ph"><small>' + (p.heic ? "iPhone photo" : "Can't show") + '</small>' + esc(p.name) + '</div></div>') +
+          '<span class="tag">' + esc(p.time || "") + ' ' + esc(p.name) + '</span></div>';
+      }).join("") + '</div>' + (g.photos.filter(function (p) { return !p.video; }).length > SHOW_THUMBS ? '<p class="tag">and ' + (g.photos.filter(function (p) { return !p.video; }).length - SHOW_THUMBS) + ' more photos in this group, all included</p>' : "") + '</div>';
+  }
+  function mmss(sec) { sec = Math.round(sec || 0); return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
+  // Videos in a stop: a still picture each, a tick for a 20-second clip, and a box for a link to the full video.
+  function videoRow(g) {
+    var vids = g.photos.filter(function (p) { return p.video; });
+    if (!vids.length) return "";
+    return '<div class="rb-videos">' + vids.map(function (p) {
+      var i = rb.photos.indexOf(p);
+      return '<div class="rb-video"><div class="pic loaded vid-poster">' + (p.thumb ? '<img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy">' : "") +
+        '<span class="vid-badge" aria-hidden="true">▶ ' + mmss(p.duration) + '</span></div>' +
+        '<label class="check"><input type="checkbox" class="rb-fav" data-i="' + i + '"' + (p.fav ? " checked" : "") + '> Keep a 20-second clip' + (p.clip ? " (made)" : "") + '</label>' +
+        '<input type="text" class="rb-link" data-i="' + i + '" value="' + esc(p.link || "") + '" placeholder="Link to the full video (optional)" aria-label="Link to the full video ' + esc(p.name) + '">' +
+        '<span class="tag">' + esc(p.time || "") + ' ' + esc(p.name) + '</span></div>';
+    }).join("") + '</div>';
+  }
   function drawGroups() {
     var out = document.getElementById("rb-out");
     if (!out) return;
@@ -521,32 +785,47 @@
       out.innerHTML = '<div class="empty" style="margin-top:18px"><b>No photos chosen yet.</b><p>Tip: photos straight from your phone keep their date and place. Photos sent through WhatsApp or downloaded from Facebook usually lose them, so use the originals from your phone or Google Photos ("Download" keeps them).</p></div>';
       return;
     }
-    var gs = groups();
+    var gs = rb.gs = groups(), T = rbTarget();
     var withGps = rb.photos.filter(function (p) { return p.lat != null; }).length;
     var guessed = rb.photos.filter(function (p) { return p.guessDate; }).length;
     var first = rb.photos[0].date, last = rb.photos[rb.photos.length - 1].date;
-    var target = holidays.filter(function (h) { return h.id === rb.target; })[0];
+    var outside = gs.filter(function (g) { return !g.inTrip; });
     var html = '<div class="notice" style="margin-top:18px">' + rb.photos.length + ' photos from ' + esc(nice(first)) + ' to ' + esc(nice(last)) + '. ' +
       withGps + ' have a place saved in them. ' + (guessed ? guessed + ' have no date inside, so we used the file date, which may be wrong. ' : "") +
-      (target && (first < target.start || last > target.end) ? '<b>Some photos fall outside ' + esc(target.title) + ' (' + esc(niceShort(target.start)) + ' to ' + esc(nice(target.end)) + ').</b> They will show as extra days.' : "") + '</div>' +
+      (T ? gs.filter(function (g) { return g.anchor; }).reduce(function (n, g) { return n + g.photos.length; }, 0) + ' matched a planned stop.' : gs.length + ' stops over ' + Object.keys(gs.reduce(function (o, g) { o[g.date] = 1; return o; }, {})).length + ' days.') + '</div>' +
       '<div class="row" style="margin-top:12px"><button class="btn" id="rb-lookup" type="button">Look up place names online</button>' +
       '<button class="btn" id="rb-clear" type="button">Start again</button><span class="tag" id="rb-lookup-msg"></span></div>';
-    var lastDate = "";
-    gs.forEach(function (g, i) {
-      if (g.date !== lastDate) { html += '<h3 style="margin-top:26px;font-size:22px">' + esc(nice(g.date, true)) + '</h3>'; lastDate = g.date; }
-      html += '<div class="group"><div class="head"><input type="text" id="rb-name-' + i + '" data-key="' + esc(g.key) + '" class="rb-name" value="' + esc(rb.names[g.key] || "") + '" placeholder="Place name" aria-label="Place name">' +
-        '<span class="tag">' + esc(g.suggest.how) + (g.lat != null ? ' · <a href="https://www.google.com/maps/search/?api=1&query=' + g.lat + ',' + g.lon + '" target="_blank" rel="noopener noreferrer">see on map</a>' : "") + '</span></div>' +
-        '<input type="text" id="rb-note-' + i + '" data-key="' + esc(g.key) + '" class="rb-note" value="' + esc(rb.notes[g.key] || "") + '" placeholder="A note, for example: Ice cream by the river" aria-label="Note">' +
-        '<div class="thumbs">' + g.photos.slice(0, SHOW_THUMBS).map(function (p) {
-          return '<div>' + (p.thumb ? '<div class="pic loaded"><img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy"></div>' : '<div class="pic"><div class="ph"><small>' + (p.heic ? "iPhone photo" : "Can't show") + '</small>' + esc(p.name) + '</div></div>') +
-            '<span class="tag">' + esc(p.time || "") + ' ' + esc(p.name) + '</span></div>';
-        }).join("") + '</div>' + (g.photos.length > SHOW_THUMBS ? '<p class="tag">and ' + (g.photos.length - SHOW_THUMBS) + ' more photos in this group, all included</p>' : "") + '</div>';
-    });
+    var cities = T ? {} : dayCities(gs);
+    if (T) {
+      (T.days || []).forEach(function (d, n) {
+        var mine = gs.filter(function (g) { return g.date === d.date; });
+        var count = function (name) { return mine.filter(function (g) { return g.anchor === name; }).reduce(function (k, g) { return k + g.photos.length; }, 0); };
+        html += '<div class="rb-day"><h3>Day ' + (n + 1) + ' · ' + esc(nice(d.date, true)) + '</h3><p class="muted">' + esc(d.title || d.city || "") + '</p>' +
+          '<ul class="rb-plan">' + (d.places || []).map(function (p) { var k = count(p.name); return '<li class="' + (k ? "has" : "none") + '"><b>' + esc(p.name) + '</b> ' + (k ? k + (k === 1 ? " photo" : " photos") : "no photos") + '</li>'; }).join("") + '</ul>' +
+          (mine.length ? "" : '<p class="tag">No photos for this day yet.</p>') + '</div>';
+        mine.forEach(function (g) { html += groupCard(g, gs.indexOf(g)); });
+      });
+      if (outside.length) {
+        html += '<div class="rb-day"><h3>Outside the trip dates</h3><p class="muted">' + outside.reduce(function (k, g) { return k + g.photos.length; }, 0) + ' photos were taken before or after ' + esc(T.title) + ' (' + esc(niceShort(T.start)) + ' to ' + esc(nice(T.end)) + ').</p>' +
+          '<label class="check"><input type="checkbox" id="rb-outside"' + (rb.skipOutside ? "" : " checked") + '> Keep them, as extra days at the end of the trip</label></div>';
+        outside.forEach(function (g) { html += groupCard(g, gs.indexOf(g)); });
+      }
+    } else {
+      var lastDate = "", dn = 0;
+      gs.forEach(function (g, i) {
+        if (g.date !== lastDate) { dn++; html += '<div class="rb-day"><h3>Day ' + dn + ' · ' + esc(nice(g.date, true)) + '</h3>' + (cities[g.date] ? '<p class="muted">In ' + esc(cities[g.date]) + '</p>' : "") + '</div>'; lastDate = g.date; }
+        html += groupCard(g, i);
+      });
+    }
     html += '<section style="margin-top:36px"><div class="section-head"><h2>Save it to the album</h2></div>' +
       '<div class="steps" id="rb-save-steps"></div>' +
       '<label for="rb-file" class="eyebrow">Holiday file</label><textarea id="rb-file" readonly></textarea>' +
       '<div class="row" style="margin-top:10px"><button class="btn primary" type="button" id="rb-save">Save holiday file</button><button class="btn" type="button" id="rb-copy">Copy holiday file</button><span class="tag" id="rb-copy-msg"></span></div></section>';
     out.innerHTML = html;
+    out.querySelectorAll(".rb-fav").forEach(function (el) { el.addEventListener("change", function () { rb.photos[+el.dataset.i].fav = el.checked; refreshFile(); }); });
+    out.querySelectorAll(".rb-link").forEach(function (el) { el.addEventListener("input", function () { rb.photos[+el.dataset.i].link = el.value.trim(); refreshFile(); }); });
+    var ob = out.querySelector("#rb-outside");
+    if (ob) ob.addEventListener("change", function () { rb.skipOutside = !ob.checked; refreshFile(); });
     out.querySelectorAll(".rb-name").forEach(function (el) { el.addEventListener("input", function () { rb.names[el.dataset.key] = el.value; refreshFile(); }); });
     out.querySelectorAll(".rb-note").forEach(function (el) { el.addEventListener("input", function () { rb.notes[el.dataset.key] = el.value; refreshFile(); }); });
     out.querySelector("#rb-clear").addEventListener("click", function () { rb.photos = []; rb.names = {}; rb.notes = {}; rb.online = {}; drawGroups(); });
@@ -582,7 +861,7 @@
   // Ask OpenStreetMap for the name of each place, one every 1.2 seconds (their rule).
   function lookupOnline(gs) {
     var msg = document.getElementById("rb-lookup-msg");
-    var todo = gs.filter(function (g) { return g.lat != null; });
+    var todo = gs.filter(function (g) { return g.lat != null && !g.anchor; });
     if (!todo.length) { msg.textContent = "None of these photos has a place saved in it."; return; }
     rb.online = rb.online || {};
     var i = 0, failed = 0;
@@ -609,16 +888,23 @@
   function refreshFile() {
     var ta = document.getElementById("rb-file");
     if (!ta || !rb.photos.length) return;
-    var gs = groups();
-    var target = holidays.filter(function (h) { return h.id === rb.target; })[0];
-    var first = rb.photos[0].date, last = rb.photos[rb.photos.length - 1].date;
+    var gs = rb.gs || groups();
+    var target = rbTarget();
+    var keep = gs.filter(function (g) { return !(target && !g.inTrip && rb.skipOutside); });
+    var dates = keep.map(function (g) { return g.date; }).sort();
+    var first = dates[0] || rb.photos[0].date, last = dates[dates.length - 1] || first;
     var id = target ? target.id : slug((rb.title || "holiday") + (String(rb.title || "").indexOf(first.slice(0, 4)) >= 0 ? "" : "-" + first.slice(0, 4)));
-    var folder = "photos/" + id + "/";
     var memories = [];
-    gs.forEach(function (g) {
+    keep.forEach(function (g) {
       g.photos.forEach(function (p) {
         if (!p.data) return;
-        var m = { date: p.date, file: p.name, image: p.data, place: rb.names[g.key] || "" };
+        var m = { date: p.date, file: p.name, image: p.data, place: g.anchor || rb.names[g.key] || "" };
+        if (g.anchor) m.stop = g.anchor;
+        if (p.video) {
+          m.kind = "video"; if (p.duration) m.duration = Math.round(p.duration);
+          if (p.fav && p.clip) m.clip = p.clip;
+          if (/^https:\/\//i.test(p.link || "")) m.link = p.link;
+        }
         if (rb.notes[g.key]) m.caption = rb.notes[g.key];
         if (p.time) m.time = p.time;
         if (p.lat != null) { m.lat = +p.lat.toFixed(3); m.lon = +p.lon.toFixed(3); }
@@ -628,35 +914,49 @@
     var steps = document.getElementById("rb-save-steps");
     var hol, isNew = !target;
     if (target) {
-      // The whole holiday again, with the new photos added (same file name replaces the old one).
+      // The whole trip again, with the new photos added (the same file names replace the old ones).
       hol = Object.assign({}, target, { memories: target.memories.slice() });
       var have = {};
       hol.memories.forEach(function (m) { have[m.date + "|" + (m.file || m.image)] = true; });
       memories.forEach(function (m) { if (!have[m.date + "|" + m.file]) hol.memories.push(m); });
       hol.memories.sort(function (a, b) { return (a.date + (a.time || "")) < (b.date + (b.time || "")) ? -1 : 1; });
     } else {
-      // A new holiday: days come from the photo groups.
-      var byDay = {};
-      gs.forEach(function (g) { (byDay[g.date] = byDay[g.date] || []).push(g); });
+      // A past trip: days, stops, cities and the route all come from the photos.
+      var byDay = {}, cities = dayCities(keep);
+      keep.forEach(function (g) { (byDay[g.date] = byDay[g.date] || []).push(g); });
       var days = Object.keys(byDay).sort().map(function (date) {
         var places = byDay[date].map(function (g) {
           var p = { name: rb.names[g.key] || "Somewhere nice", type: "sight" };
           if (g.lat != null) { p.lat = +g.lat.toFixed(3); p.lon = +g.lon.toFixed(3); }
           if (rb.notes[g.key]) p.note = rb.notes[g.key];
+          p.note = (p.note ? p.note + " · " : "") + g.photos.length + (g.photos.length === 1 ? " photo" : " photos");
           return p;
         });
-        var names = places.map(function (p) { return p.name; });
-        return { date: date, title: names.slice(0, 2).join(" and "), places: places };
+        var seen = {};
+        places.forEach(function (p) { seen[p.name] = (seen[p.name] || 0) + 1; if (seen[p.name] > 1) p.name += ", stop " + seen[p.name]; });
+        var names = places.map(function (p) { return p.name; }).filter(function (n) { return n !== "Somewhere nice"; });
+        var city = cities[date] || "";
+        return { date: date, city: city, title: city || names[0] || "A day out", places: places };
       });
+      var route = [];
+      days.forEach(function (d) {
+        var lastR = route[route.length - 1];
+        if (d.city && lastR && lastR.city === d.city) lastR.days++;
+        else if (d.city) route.push({ city: d.city, days: 1 });
+      });
+      route = route.map(function (r, i) { return { city: r.city, nights: i === route.length - 1 ? Math.max(r.days - 1, 0) : r.days }; });
+      var cityList = route.map(function (r) { return r.city; }).filter(function (c, i, a) { return a.indexOf(c) === i; });
       hol = {
-        id: id, title: rb.title || "Our holiday", subtitle: rb.sub || "", start: first, end: last,
-        cover: { image: memories[0] ? memories[0].image : "" }, summary: "", days: days, memories: memories
+        id: id, title: rb.title || "Our holiday", subtitle: rb.sub || cityList.slice(0, 5).join(", "), start: first, end: last,
+        cover: { image: memories[0] ? memories[Math.floor(memories.length / 3)].image : "" },
+        summary: days.length + " days and " + memories.length + " photos" + (cityList.length ? ", from " + cityList.slice(0, 6).join(" to ") : "") + ".",
+        route: route, days: days, memories: memories
       };
     }
     // Big holidays are split into parts of about 30 MB of photos (about 40 MB once locked), well under GitHub's 100 MB limit.
     var parts = [[]], size = 0, LIMIT = 30 * 1048576;
     hol.memories.forEach(function (m) {
-      var n = (m.image || "").length;
+      var n = (m.image || "").length + (m.clip || "").length;
       if (size + n > LIMIT && parts[parts.length - 1].length) { parts.push([]); size = 0; }
       parts[parts.length - 1].push(m); size += n;
     });
@@ -675,6 +975,18 @@
   }
   // Lock each part with the passkey, one after another, showing progress.
   function buildFiles(msg) {
+    var todo = rb.photos.filter(function (p) { return p.video && p.fav && !p.clip && p.file; });
+    if (todo.length) {
+      return todo.reduce(function (chain, p, i) {
+        return chain.then(function () {
+          if (msg) msg.textContent = "Making clip " + (i + 1) + " of " + todo.length + " (" + p.name + "). Each takes about 20 seconds…";
+          return makeClip(p.file, 20).then(function (clip) { p.clip = clip || ""; });
+        });
+      }, Promise.resolve()).then(function () { refreshFile(); return lockFiles(msg); });
+    }
+    return lockFiles(msg);
+  }
+  function lockFiles(msg) {
     var plan = rb.plan;
     if (!plan) return Promise.reject();
     if (rb.built && rb.built.plan === plan) return Promise.resolve(rb.built.files);
