@@ -256,7 +256,16 @@ footer.wrap::before { content: ""; position: absolute; left: 0; right: 0; top: 0
 .gate-card { width: 100%; max-width: 420px; background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-lg); padding: 32px 28px; display: grid; gap: 12px; justify-items: start; }
 .gate-card h1 { font-size: 32px; }
 .gate-card form { display: grid; gap: 10px; width: 100%; margin-top: 6px; }
-.gate-card input[type="password"] { font: 400 18px/1.4 var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; width: 100%; }
+.pass-row { display: flex; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); overflow: hidden; }
+.pass-row:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.pass-row input#gate-pass { flex: 1; min-width: 0; border: 0 !important; border-radius: 0 !important; outline: none; background: transparent !important; }
+.pass-eye { flex: none; width: 48px; display: grid; place-items: center; border: 0; border-left: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; padding: 0; }
+.pass-eye:hover { color: var(--ink); background: var(--indigo-tint); }
+.pass-eye:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+.pass-eye .eye-slash { display: none; }
+.pass-eye[aria-pressed="true"] { color: var(--indigo); }
+.pass-eye[aria-pressed="true"] .eye-slash { display: inline; }
+.gate-card input[type="password"], .gate-card input#gate-pass { font: 400 18px/1.4 var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; width: 100%; }
 .gate-card .btn { justify-content: center; padding: 11px 16px; font-size: 16px; }
 .gate-card .btn:disabled { opacity: .6; cursor: wait; }
 .check { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); }

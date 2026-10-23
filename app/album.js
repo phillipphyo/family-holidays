@@ -731,7 +731,8 @@
     return '<div class="gate"><div class="gate-card"><span class="seal big" aria-hidden="true">旅</span>' +
       '<h1>Our Holiday Album</h1><p class="muted">This album is for our family. Enter the passkey to open it.</p>' +
       '<form id="gate-form" autocomplete="off"><label for="gate-pass" class="eyebrow">Passkey</label>' +
-      '<input id="gate-pass" type="password" autocomplete="current-password" required>' +
+      '<div class="pass-row"><input id="gate-pass" type="password" autocomplete="current-password" required spellcheck="false" autocapitalize="off">' +
+      '<button class="pass-eye" type="button" id="gate-eye" aria-controls="gate-pass" aria-pressed="false" aria-label="Show passkey" title="Show passkey"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path class="eye-slash" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>' +
       '<label class="check" for="gate-remember"><input id="gate-remember" type="checkbox"> Remember on this device</label>' +
       '<button class="btn primary" type="submit" id="gate-go">Open the album</button>' +
       '<p class="gate-msg" id="gate-msg" role="status"></p></form></div></div>';
@@ -742,7 +743,20 @@
     document.title = "Family Holiday Album";
     var form = root.querySelector("#gate-form"), input = root.querySelector("#gate-pass"), msg = root.querySelector("#gate-msg"), go = root.querySelector("#gate-go");
     input.focus();
+    // The eye button shows or hides the typed passkey. It sits beside the box, not inside it,
+    // so a password manager's own icon at the box's edge never covers it.
+    var eye = root.querySelector("#gate-eye");
+    eye.addEventListener("click", function () {
+      var show = input.type === "password";
+      input.type = show ? "text" : "password";
+      eye.setAttribute("aria-pressed", String(show));
+      eye.setAttribute("aria-label", show ? "Hide passkey" : "Show passkey");
+      eye.title = show ? "Hide passkey" : "Show passkey";
+      var end = input.value.length; input.focus();
+      try { input.setSelectionRange(end, end); } catch (e) { /* some input types refuse */ }
+    });
     form.addEventListener("submit", function (e) {
+      input.type = "password"; eye.setAttribute("aria-pressed", "false");
       e.preventDefault();
       var pass = input.value;
       if (!window.crypto || !crypto.subtle) { msg.textContent = "This browser can't open locked files. Try Chrome, Edge or Safari."; return; }
