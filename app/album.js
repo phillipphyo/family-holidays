@@ -559,6 +559,14 @@
       vid.src = url;
     });
   }
+  function videoStandIn(name) {
+    var c = document.createElement("canvas"); c.width = 640; c.height = 360;
+    var g = c.getContext("2d"), grad = g.createLinearGradient(0, 0, 640, 360);
+    grad.addColorStop(0, "#2a3a8f"); grad.addColorStop(1, "#10162a"); g.fillStyle = grad; g.fillRect(0, 0, 640, 360);
+    g.fillStyle = "rgba(255,255,255,.9)"; g.beginPath(); g.moveTo(296, 150); g.lineTo(296, 210); g.lineTo(348, 180); g.closePath(); g.fill();
+    g.font = "500 20px sans-serif"; g.textAlign = "center"; g.fillText(String(name).slice(0, 40), 320, 260);
+    return c.toDataURL("image/jpeg", 0.8);
+  }
   function readVideo(file) {
     var item = { name: file.name, video: true, file: file };
     return videoMeta(file).then(function (meta) {
@@ -566,9 +574,11 @@
       if (dt && !isNaN(dt)) { item.when = dt.toISOString(); item.date = iso(dt); item.time = String(dt.getHours()).padStart(2, "0") + ":" + String(dt.getMinutes()).padStart(2, "0"); }
       else { var d = new Date(file.lastModified || Date.now()); item.when = d.toISOString(); item.date = iso(d); item.guessDate = true; }
       if (meta.lat != null && Math.abs(meta.lat) <= 90 && Math.abs(meta.lon) <= 180) { item.lat = +meta.lat.toFixed(5); item.lon = +meta.lon.toFixed(5); }
+      item.duration = meta.duration || 0;
       return videoPoster(file);
     }).then(function (res) {
-      if (res) { item.data = res.data; item.thumb = res.thumb; item.duration = res.duration; }
+      if (res) { item.data = res.data; item.thumb = res.thumb; item.duration = res.duration || item.duration; }
+      else { var still = videoStandIn(file.name); item.data = still; item.thumb = still; item.noStill = true; } // this browser can't open the video, so it gets a plain tile
       return item;
     });
   }
@@ -755,7 +765,7 @@
     return '<div class="group' + (fixed ? " matched" : "") + '"><div class="head">' +
       (fixed ? '<h4 class="rb-stop"><span class="rb-pin" aria-hidden="true">✓</span>' + esc(g.anchor) + '</h4>'
              : '<input type="text" id="rb-name-' + i + '" data-key="' + esc(g.key) + '" class="rb-name" value="' + esc(rb.names[g.key] || "") + '" placeholder="Place name" aria-label="Place name">') +
-      '<span class="tag">' + g.photos.length + (g.photos.length === 1 ? " photo · " : " photos · ") + esc(g.suggest.how) +
+      '<span class="tag">' + countText(g.photos) + ' · ' + esc(g.suggest.how) +
       (g.lat != null ? ' · <a href="https://www.google.com/maps/search/?api=1&query=' + g.lat + ',' + g.lon + '" target="_blank" rel="noopener noreferrer">see on map</a>' : "") + '</span></div>' +
       '<input type="text" id="rb-note-' + i + '" data-key="' + esc(g.key) + '" class="rb-note" value="' + esc(rb.notes[g.key] || "") + '" placeholder="A note, for example: Ice cream by the river" aria-label="Note for ' + esc(rb.names[g.key] || "this stop") + '">' +
       videoRow(g) +
@@ -763,6 +773,12 @@
         return '<div>' + (p.thumb ? '<div class="pic loaded"><img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy"></div>' : '<div class="pic"><div class="ph"><small>' + (p.heic ? "iPhone photo" : "Can't show") + '</small>' + esc(p.name) + '</div></div>') +
           '<span class="tag">' + esc(p.time || "") + ' ' + esc(p.name) + '</span></div>';
       }).join("") + '</div>' + (g.photos.filter(function (p) { return !p.video; }).length > SHOW_THUMBS ? '<p class="tag">and ' + (g.photos.filter(function (p) { return !p.video; }).length - SHOW_THUMBS) + ' more photos in this group, all included</p>' : "") + '</div>';
+  }
+  function countText(list) {
+    var v = list.filter(function (p) { return p.video; }).length, ph = list.length - v, bits = [];
+    if (ph || !v) bits.push(ph + (ph === 1 ? " photo" : " photos"));
+    if (v) bits.push(v + (v === 1 ? " video" : " videos"));
+    return bits.join(" and ");
   }
   function mmss(sec) { sec = Math.round(sec || 0); return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
   // Videos in a stop: a still picture each, a tick for a 20-second clip, and a box for a link to the full video.
@@ -790,7 +806,7 @@
     var guessed = rb.photos.filter(function (p) { return p.guessDate; }).length;
     var first = rb.photos[0].date, last = rb.photos[rb.photos.length - 1].date;
     var outside = gs.filter(function (g) { return !g.inTrip; });
-    var html = '<div class="notice" style="margin-top:18px">' + rb.photos.length + ' photos from ' + esc(nice(first)) + ' to ' + esc(nice(last)) + '. ' +
+    var html = '<div class="notice" style="margin-top:18px">' + countText(rb.photos) + ' from ' + esc(nice(first)) + ' to ' + esc(nice(last)) + '. ' +
       withGps + ' have a place saved in them. ' + (guessed ? guessed + ' have no date inside, so we used the file date, which may be wrong. ' : "") +
       (T ? gs.filter(function (g) { return g.anchor; }).reduce(function (n, g) { return n + g.photos.length; }, 0) + ' matched a planned stop.' : gs.length + ' stops over ' + Object.keys(gs.reduce(function (o, g) { o[g.date] = 1; return o; }, {})).length + ' days.') + '</div>' +
       '<div class="row" style="margin-top:12px"><button class="btn" id="rb-lookup" type="button">Look up place names online</button>' +
@@ -799,9 +815,9 @@
     if (T) {
       (T.days || []).forEach(function (d, n) {
         var mine = gs.filter(function (g) { return g.date === d.date; });
-        var count = function (name) { return mine.filter(function (g) { return g.anchor === name; }).reduce(function (k, g) { return k + g.photos.length; }, 0); };
+        var count = function (name) { return mine.filter(function (g) { return g.anchor === name; }).reduce(function (k, g) { return k.concat(g.photos); }, []); };
         html += '<div class="rb-day"><h3>Day ' + (n + 1) + ' · ' + esc(nice(d.date, true)) + '</h3><p class="muted">' + esc(d.title || d.city || "") + '</p>' +
-          '<ul class="rb-plan">' + (d.places || []).map(function (p) { var k = count(p.name); return '<li class="' + (k ? "has" : "none") + '"><b>' + esc(p.name) + '</b> ' + (k ? k + (k === 1 ? " photo" : " photos") : "no photos") + '</li>'; }).join("") + '</ul>' +
+          '<ul class="rb-plan">' + (d.places || []).map(function (p) { var k = count(p.name); return '<li class="' + (k.length ? "has" : "none") + '"><b>' + esc(p.name) + '</b> ' + (k.length ? countText(k) : "no photos") + '</li>'; }).join("") + '</ul>' +
           (mine.length ? "" : '<p class="tag">No photos for this day yet.</p>') + '</div>';
         mine.forEach(function (g) { html += groupCard(g, gs.indexOf(g)); });
       });
@@ -929,7 +945,7 @@
           var p = { name: rb.names[g.key] || "Somewhere nice", type: "sight" };
           if (g.lat != null) { p.lat = +g.lat.toFixed(3); p.lon = +g.lon.toFixed(3); }
           if (rb.notes[g.key]) p.note = rb.notes[g.key];
-          p.note = (p.note ? p.note + " · " : "") + g.photos.length + (g.photos.length === 1 ? " photo" : " photos");
+          p.note = (p.note ? p.note + " · " : "") + countText(g.photos);
           return p;
         });
         var seen = {};
@@ -949,7 +965,7 @@
       hol = {
         id: id, title: rb.title || "Our holiday", subtitle: rb.sub || cityList.slice(0, 5).join(", "), start: first, end: last,
         cover: { image: memories[0] ? memories[Math.floor(memories.length / 3)].image : "" },
-        summary: days.length + " days and " + memories.length + " photos" + (cityList.length ? ", from " + cityList.slice(0, 6).join(" to ") : "") + ".",
+        summary: days.length + " days and " + countText(memories.map(function (m) { return { video: m.kind === "video" }; })) + (cityList.length ? ", from " + cityList.slice(0, 6).join(" to ") : "") + ".",
         route: route, days: days, memories: memories
       };
     }

@@ -13,7 +13,7 @@
   --shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(22, 30, 53, .05), 0 6px 18px -6px rgba(22, 30, 53, .14);
   --shadow-lg: 0 0 0 1px rgba(22, 30, 53, .10), 0 2px 4px rgba(22, 30, 53, .06), 0 28px 64px -16px rgba(22, 30, 53, .40);
   --hair: rgba(22, 30, 53, .10);
-  --focus: #8a5a00;
+  --focus: #2a3a8f; --focus-halo: rgba(42, 58, 143, .14); --photo-ring: #ffffff; --photo-halo: rgba(10, 14, 28, .72);
   --maple-tint: #f9efee; --maple-edge: #e4bab5; --indigo-tint: #eeeff6; --indigo-edge: #b4bad8;
   --wave: radial-gradient(circle at 100% 100%, transparent 18px, rgba(255,255,255,.10) 19px, rgba(255,255,255,.10) 21px, transparent 22px) center bottom / 44px 22px, radial-gradient(circle at 0 100%, transparent 18px, rgba(255,255,255,.10) 19px, rgba(255,255,255,.10) 21px, transparent 22px) center bottom / 44px 22px;
   --wave-ink: radial-gradient(circle at 100% 100%, transparent 18px, rgba(42,58,143,.07) 19px, rgba(42,58,143,.07) 21px, transparent 22px) center bottom / 44px 22px, radial-gradient(circle at 0 100%, transparent 18px, rgba(42,58,143,.07) 19px, rgba(42,58,143,.07) 21px, transparent 22px) center bottom / 44px 22px;
@@ -33,7 +33,7 @@
     --indigo: #9fb1ff; --gold: #f0b847; --maple: #f07a62; --on-indigo: #0e1322;
     --shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
     --shadow-lg: 0 0 0 1px rgba(255,255,255,.12), 0 28px 64px -12px rgba(0,0,0,.7);
-    --hair: rgba(255,255,255,.08); --focus: #f0b847;
+    --hair: rgba(255,255,255,.08); --focus: #9fb1ff; --focus-halo: rgba(159, 177, 255, .22);
     --maple-tint: #302837; --maple-edge: #623e42; --indigo-tint: #262f4a; --indigo-edge: #465179;
     --wave-ink: radial-gradient(circle at 100% 100%, transparent 18px, rgba(159,177,255,.07) 19px, rgba(159,177,255,.07) 21px, transparent 22px) center bottom / 44px 22px, radial-gradient(circle at 0 100%, transparent 18px, rgba(159,177,255,.07) 19px, rgba(159,177,255,.07) 21px, transparent 22px) center bottom / 44px 22px;
     --stub-bg: var(--wave), linear-gradient(160deg, #2c3a7c, #1b2350); --stub-ink: #eef1ff; --foot-shade: rgba(0, 0, 0, .7); --hero-mix: 35%; --gutter-dim: #050709;
@@ -47,7 +47,7 @@
   --indigo: #9fb1ff; --gold: #f0b847; --maple: #f07a62; --on-indigo: #0e1322;
   --shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
     --shadow-lg: 0 0 0 1px rgba(255,255,255,.12), 0 28px 64px -12px rgba(0,0,0,.7);
-    --hair: rgba(255,255,255,.08); --focus: #f0b847;
+    --hair: rgba(255,255,255,.08); --focus: #9fb1ff; --focus-halo: rgba(159, 177, 255, .22);
     --maple-tint: #302837; --maple-edge: #623e42; --indigo-tint: #262f4a; --indigo-edge: #465179;
     --wave-ink: radial-gradient(circle at 100% 100%, transparent 18px, rgba(159,177,255,.07) 19px, rgba(159,177,255,.07) 21px, transparent 22px) center bottom / 44px 22px, radial-gradient(circle at 0 100%, transparent 18px, rgba(159,177,255,.07) 19px, rgba(159,177,255,.07) 21px, transparent 22px) center bottom / 44px 22px;
     --stub-bg: var(--wave), linear-gradient(160deg, #2c3a7c, #1b2350); --stub-ink: #eef1ff; --foot-shade: rgba(0, 0, 0, .7); --hero-mix: 35%; --gutter-dim: #050709;
@@ -66,9 +66,6 @@ body {
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper); }
 img { max-width: 100%; display: block; }
 a { color: var(--indigo); }
-a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, label:focus-within {
-  outline: 3px solid var(--focus); outline-offset: 2px;
-}
 h1, h2, h3 { font-family: var(--display); font-weight: 800; line-height: 1.2; text-wrap: balance; margin: 0; }
 p { margin: 0; }
 .wrap { max-width: 1120px; margin: 0 auto; }
@@ -169,7 +166,7 @@ main section.cover { margin-top: 0; }
 .stay h3 { font-size: 21px; }
 
 /* Day ticket */
-.day { margin-top: 56px; scroll-margin-top: 96px; }
+.day { margin-top: 56px; scroll-margin-top: 20px; }
 .ticket { display: grid; grid-template-columns: 132px 1fr; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
 .ticket .stub { background: var(--stub-bg); color: var(--stub-ink, var(--on-indigo)); padding: 16px; display: grid; align-content: center; gap: 2px; position: relative; text-align: center; }
 .ticket .stub::after { content: ""; position: absolute; top: 12px; bottom: 12px; right: -3px; width: 6px; background: radial-gradient(circle, var(--surface) 2px, transparent 2.5px) center top / 6px 10px repeat-y; }
@@ -257,11 +254,9 @@ footer.wrap::before { content: ""; position: absolute; left: 0; right: 0; top: 0
 .gate-card h1 { font-size: 32px; }
 .gate-card form { display: grid; gap: 10px; width: 100%; margin-top: 6px; }
 .pass-row { display: flex; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); overflow: hidden; }
-.pass-row:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
 .pass-row input#gate-pass { flex: 1; min-width: 0; border: 0 !important; border-radius: 0 !important; outline: none; background: transparent !important; }
 .pass-eye { flex: none; width: 48px; display: grid; place-items: center; border: 0; border-left: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; padding: 0; }
 .pass-eye:hover { color: var(--ink); background: var(--indigo-tint); }
-.pass-eye:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 .pass-eye .eye-slash { display: none; }
 .pass-eye[aria-pressed="true"] { color: var(--indigo); }
 .pass-eye[aria-pressed="true"] .eye-slash { display: inline; }
@@ -305,7 +300,6 @@ footer.wrap::before { content: ""; position: absolute; left: 0; right: 0; top: 0
 .links.seg .btn + .btn { border-left: 1px solid var(--line); }
 .links.seg .btn:hover { background: var(--indigo-tint); color: var(--indigo); }
 .links.seg .btn.is-primary { background: var(--indigo); color: var(--on-indigo); }
-.links.seg .btn:focus-visible { outline: 2px solid var(--surface); outline-offset: -2px; box-shadow: inset 0 0 0 5px var(--focus); }
 @media (min-width: 900px) { .places { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; } }
 @media (pointer: coarse) { .more-btn, .links.seg .btn, .btn.small:not(.nav .btn) { min-height: 44px; } }
 .nav .btn { min-height: 36px; padding: 6px 12px; font-size: 15px; background: transparent; border-color: var(--line); color: var(--muted); }
@@ -353,7 +347,6 @@ dialog.more::backdrop { background: rgba(8, 11, 22, .72); }
   background: rgba(10, 14, 28, .78); padding: 4px 9px; border-radius: 10px; text-decoration: none;
 }
 .more-hero .credit:hover { text-decoration: underline; }
-.more-hero .credit:focus-visible { outline: 3px solid #fff; box-shadow: 0 0 0 6px #10162a; }
 .more-title { position: relative; z-index: 1; display: grid; gap: 4px; padding: 72px 24px 20px; text-shadow: 0 1px 2px rgba(0, 0, 0, .45); }
 .more-hero.no-pic .more-title { padding-top: 76px; }
 .more-kicker { font: 500 12px/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #ffd88a; }
@@ -367,7 +360,6 @@ dialog.more::backdrop { background: rgba(8, 11, 22, .72); }
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
 .more-close:hover { background: rgba(10, 14, 28, .85); }
-.more-close:focus-visible { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px #10162a; }
 .more-body { padding: 8px 24px 20px; display: grid; }
 .more-row { display: grid; gap: 4px; padding-block: 14px; border-top: 1px solid var(--line); }
 .more-row.first { border-top: 0; }
@@ -427,3 +419,146 @@ dialog.more::backdrop { background: rgba(8, 11, 22, .72); }
 .group.matched { box-shadow: inset 3px 0 0 var(--t-hotel), var(--shadow); }
 .rb-stop { margin: 0; font: 700 16px/1.3 var(--body); display: flex; gap: 8px; align-items: center; }
 .rb-pin { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--t-hotel); color: var(--surface); font-size: 12px; }
+
+/* ---------- Focus system ---------- */
+
+/* 1. Ring: everything you click. Keyboard only (:focus-visible), so mouse/touch leave no ring.
+      :where() keeps specificity at 0,1,0 so the component rules below override cleanly. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+/* Plain text links get soft corners on the ring (pills/cards/buttons keep their own radius) */
+:where(a:not([class]), .info-link, .brand):focus-visible { border-radius: 4px; }
+/* Cards: 3px gap keeps the ring clear of the card edge and of the 2px "selected" ring on mode cards */
+.trip-card:focus-visible { outline-offset: 3px; }
+.rb-mode:focus-visible { outline-offset: 4px; }
+.more-scroll:focus-visible { outline-offset: -3px; }
+/* Checkboxes */
+input[type="checkbox"] { accent-color: var(--indigo); }
+input[type="checkbox"]:focus-visible { border-radius: 4px; }
+
+/* 2. Field focus: text, date, password, select, textarea. On :focus so a click/tap shows it too.
+      Border + 1px inner spread = solid 2px indigo edge (meets 3:1); halo is the soft extra.
+      Transparent outline is the Windows High Contrast fallback. */
+input[type="text"], input[type="date"], input[type="password"], select, textarea {
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+input[type="text"]:focus, input[type="date"]:focus, input[type="password"]:focus, select:focus, textarea:focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--focus-halo);
+}
+
+/* 3. Passkey row: the ROW wears the field focus when the input is focused; the input itself
+      shows nothing (it also turns type="text" when the eye is pressed, hence the box-shadow reset). */
+.pass-row { transition: border-color .15s ease, box-shadow .15s ease; }
+.pass-row:has(#gate-pass:focus) {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--focus-halo);
+}
+.pass-row input#gate-pass:focus { box-shadow: none; }
+/* Eye button: inset rounded ring, never clipped by the row's overflow:hidden, and the row
+   does NOT light up at the same time, so no double rectangle. */
+.pass-eye { position: relative; }
+.pass-eye:focus-visible { outline: 2px solid transparent; outline-offset: -4px; }
+.pass-eye:focus-visible::after {
+  content: ""; position: absolute; inset: 4px; border-radius: 6px;
+  box-shadow: inset 0 0 0 2px var(--focus); pointer-events: none;
+}
+
+/* 4. Photo drop zone (label wrapping an invisible file input): field-style focus on the label.
+      Replaces what label:focus-within used to do, keyboard only. */
+.drop { transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease; }
+.drop:has(input:focus-visible) {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  border-style: solid;
+  border-color: var(--focus);
+  background: var(--indigo-tint);
+  box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--focus-halo);
+}
+
+/* Fallback for browsers without :has() (kept separate so an unknown selector can't void other rules) */
+@supports not selector(:has(*)) {
+  .pass-row:focus-within,
+  .drop:focus-within {
+    outline: 2px solid transparent;
+    border-color: var(--focus);
+    box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--focus-halo);
+  }
+}
+
+/* 5. Segmented Photos | Videos | Map bar: inset rounded ring inside the cell (bar clips outside rings).
+      10px bar radius - 4px inset = 6px ring radius. On the filled indigo cell the ring flips colour. */
+.links.seg .btn { position: relative; }
+.links.seg .btn:focus-visible { outline: 2px solid transparent; outline-offset: -4px; box-shadow: none; }
+.links.seg .btn:focus-visible::after {
+  content: ""; position: absolute; inset: 4px; border-radius: 6px;
+  box-shadow: inset 0 0 0 2px var(--focus); pointer-events: none;
+}
+.links.seg .btn.is-primary:focus-visible::after { box-shadow: inset 0 0 0 2px var(--on-indigo); }
+
+/* 6. On photos: white 2px ring over a dark halo, so it shows on any picture.
+      Total reach 6px fits inside the 8px credit inset of clipped .pic / .cover frames. */
+.more-close:focus-visible,
+.more-hero .credit:focus-visible,
+.pic a.credit:focus-visible {
+  outline: 2px solid var(--photo-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px var(--photo-halo);
+}
+.more-hero .credit:focus-visible,
+.pic a.credit:focus-visible { text-decoration: underline; }
+
+/* 7. Phones: no iOS zoom on field focus (it crops the halo); soft indigo tap flash instead of grey/blue */
+html { -webkit-tap-highlight-color: var(--focus-halo); }
+@media (max-width: 560px), (pointer: coarse) {
+  input[type="text"], input[type="date"], input[type="password"], select, textarea:not([readonly]) { font-size: 16px; }
+}
+
+/* 8. Keep keyboard focus out from under the sticky top bar (WCAG 2.4.11).
+      Bar is ~57px on one row; it wraps to two rows (~101px) on narrow screens.
+      Remember STEP 2: .day scroll-margin-top 96px -> 20px. */
+html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 76px); }
+@media (max-width: 720px) { html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 120px); } }
+
+/* 9. Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  input[type="text"], input[type="date"], input[type="password"], select, textarea, .pass-row, .drop { transition: none; }
+}
+
+/* 10. Windows High Contrast / forced colours: box-shadows vanish, so outlines carry focus.
+       :has() rules kept separate so an unsupported selector can't drop the whole list. */
+@media (forced-colors: active) {
+  :focus-visible,
+  input:focus, select:focus, textarea:focus { outline: 2px solid Highlight !important; }
+  .pass-row:has(#gate-pass:focus) { outline: 2px solid Highlight !important; }
+  .drop:has(input:focus-visible) { outline: 2px solid Highlight !important; }
+  /* the row carries the passkey focus; the hidden file input is invisible anyway */
+  .pass-row input#gate-pass:focus,
+  .drop input:focus-visible { outline: none !important; }
+  /* inset pseudo rings would double up with the now-visible outline */
+  .links.seg .btn:focus-visible::after,
+  .pass-eye:focus-visible::after { display: none; }
+  /* mode-card radio dot is drawn with box-shadow only; give it a real border and fill */
+  .rb-mode .rb-dot { border: 2px solid CanvasText; }
+  .rb-mode[aria-checked="true"] .rb-dot { forced-color-adjust: none; background: Highlight; border-color: Highlight; }
+}
+/* ---------- end focus system ---------- */
+/* Videos: a still picture with a play mark and length, then the clip tick and the link box */
+.rb-videos { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin: 12px 0; }
+.rb-video { display: grid; gap: 8px; align-content: start; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.rb-video .tag { overflow-wrap: anywhere; }
+.vid-poster { position: relative; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #10162a; }
+.vid-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vid-badge {
+  position: absolute; left: 8px; bottom: 8px; padding: 3px 9px; border-radius: 999px;
+  font: 600 12px/1.4 var(--mono); color: #fff; background: rgba(10, 14, 28, .78);
+}
+figure.vid video { width: 100%; height: 100%; display: block; object-fit: cover; background: #10162a; }
+.memories .vid-poster { aspect-ratio: auto; height: 100%; border-radius: 0; }
+figure.vid a { display: block; color: inherit; }
