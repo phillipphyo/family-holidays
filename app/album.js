@@ -1959,6 +1959,7 @@
     var box = b.closest(".info-box"), h = holidays.filter(function (x) { return x.id === box.dataset.h; })[0], msg = box.querySelector(".info-msg");
     if (!h) return;
     if (b.classList.contains("info-copy")) {
+      if (laterFor(h.id).length || partsBusy[h.id]) { loadParts(h.id); msg.textContent = "Still loading this trip's photos, so the times aren't ready yet. Press Copy again in a moment."; return; }
       var text = placeList(h), ta = box.querySelector("#info-in");
       var fail = function () { ta.value = text; ta.select(); msg.textContent = "Press Ctrl+C (or Cmd+C) to copy the selected text, then clear the box before pasting Claude's reply."; };
       try { navigator.clipboard.writeText(text).then(function () { msg.textContent = "Copied. Paste it to Claude, then paste the reply in the box below."; }, fail); } catch (e) { fail(); }
