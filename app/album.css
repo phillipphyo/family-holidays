@@ -587,3 +587,14 @@ figure.vid a { display: block; color: inherit; }
 .rb-yt-help textarea { width: 100%; font: 400 14px/1.5 var(--mono); }
 @media (max-width: 600px) { .memories figure.vid { grid-column: 1 / -1; } .memories .vid-poster, .memories figure.vid > .pic { aspect-ratio: 16 / 9; } }
 .rb-yt-help textarea { min-height: 96px; height: 110px; }
+
+/* Tidy-up: photos set aside (blurry, repeats, nearly the same), each with a Keep tick */
+.rb-tidy { margin: 18px 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); display: grid; gap: 10px; }
+.rb-tidy h3 { font: 700 17px/1.3 var(--display); }
+.rb-tidy summary { cursor: pointer; color: var(--indigo); font-weight: 600; }
+.rb-tidy-sec { margin-top: 14px; display: grid; gap: 6px; }
+.rb-tidy-sec h4 { font: 700 15px/1.3 var(--body); }
+.rb-tidy-pic { position: relative; display: grid; gap: 4px; cursor: pointer; }
+.rb-tidy-pic img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px; opacity: .6; display: block; }
+.rb-tidy-pic.kept img { opacity: 1; box-shadow: 0 0 0 2px var(--indigo); }
+.rb-tidy-sec .btn { justify-self: start; }

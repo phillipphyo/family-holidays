@@ -540,6 +540,7 @@
     function finish() {
       rb.busy = null;
       rb.photos = rb.photos.concat(items).sort(function (a, b) { return a.when < b.when ? -1 : 1; });
+      tidy();
       drawGroups();
     }
     function pump() {
@@ -691,6 +692,9 @@
     return pool;
   }
   function readAny(file, size) {
+    return readAny2(file, size).then(function (item) { item.bytes = file.size; return item; });
+  }
+  function readAny2(file, size) {
     if (isVideo(file)) return readVideo(file);
     var free = !poolBroken && pool && pool.filter(function (w) { return !w.busy; })[0];
     if (!free) return readPhoto(file, size);
@@ -703,11 +707,93 @@
         if (dt) { item.when = dt.toISOString(); item.date = iso(dt); item.time = String(dt.getHours()).padStart(2, "0") + ":" + String(dt.getMinutes()).padStart(2, "0"); }
         else { var d = new Date(file.lastModified || Date.now()); item.when = d.toISOString(); item.date = iso(d); item.guessDate = true; }
         if (r.lat != null) { item.lat = +r.lat.toFixed(5); item.lon = +r.lon.toFixed(5); }
-        if (r.data) { item.data = r.data; item.thumb = r.thumb; }
+        if (r.data) { item.data = r.data; item.thumb = r.thumb; item.sharp = r.sharp; item.hash = r.hash; }
         resolve(item);
       } };
       free.postMessage({ id: id, file: file, heic: item.heic, max: size.max, q: size.q });
     });
+  }
+  // How sharp a picture is, and a tiny fingerprint of how it looks (same as in photo-worker.js).
+  function looks(img) {
+    var w = img.width, h = img.height, d = img.data, gray = new Float32Array(w * h), i, x, y;
+    for (i = 0; i < w * h; i++) gray[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114;
+    var sum = 0, sq = 0, n = 0;
+    for (y = 1; y < h - 1; y++) for (x = 1; x < w - 1; x++) {
+      i = y * w + x; var l = gray[i - 1] + gray[i + 1] + gray[i - w] + gray[i + w] - 4 * gray[i];
+      sum += l; sq += l * l; n++;
+    }
+    var sharp = n ? sq / n - (sum / n) * (sum / n) : 0, cells = [], hash = "";
+    for (y = 0; y < 8; y++) for (x = 0; x < 9; x++) {
+      var x0 = Math.floor(x * w / 9), x1 = Math.max(x0 + 1, Math.floor((x + 1) * w / 9)), y0 = Math.floor(y * h / 8), y1 = Math.max(y0 + 1, Math.floor((y + 1) * h / 8)), t = 0, c = 0;
+      for (var yy = y0; yy < y1; yy++) for (var xx = x0; xx < x1; xx++) { t += gray[yy * w + xx]; c++; }
+      cells.push(t / c);
+    }
+    for (y = 0; y < 8; y++) { var nib = 0; for (x = 0; x < 8; x++) { nib = nib * 2 + (cells[y * 9 + x] > cells[y * 9 + x + 1] ? 1 : 0); if (x === 3 || x === 7) { hash += nib.toString(16); nib = 0; } } }
+    return { sharp: Math.round(sharp), hash: hash };
+  }
+  function hamming(a, b) {
+    var n = 0;
+    for (var i = 0; i < 16; i++) { var x = parseInt(a[i], 16) ^ parseInt(b[i], 16); while (x) { n += x & 1; x >>= 1; } }
+    return n;
+  }
+  // Tidy-up: set aside blurry photos, repeats, and bursts of nearly the same shot (keeping the sharpest).
+  // Nothing is thrown away: set-aside photos are listed so they can be kept with one tick.
+  function tidy() {
+    var ph = rb.photos.filter(function (p) { return !p.video && p.hash; });
+    rb.photos.forEach(function (p) { delete p.tidy; delete p.twin; });
+    var seen = {};
+    rb.photos.forEach(function (p) {
+      var k = p.name + "|" + (p.bytes || "") + "|" + (p.when || "");
+      if (seen[k]) { p.tidy = "repeat"; p.twin = seen[k]; } else seen[k] = p;
+    });
+    var sharpList = ph.map(function (p) { return p.sharp; }).sort(function (a, b) { return a - b; });
+    var median = sharpList.length ? sharpList[Math.floor(sharpList.length / 2)] : 0, blurLine = Math.max(12, median * 0.18);
+    var t = function (p) { return p.guessDate ? null : Date.parse(p.when); };
+    for (var i = 0; i < ph.length; i++) {
+      var a = ph[i];
+      if (a.tidy) continue;
+      for (var j = i + 1; j < ph.length; j++) {
+        var b = ph[j];
+        if (b.tidy) continue;
+        var ta = t(a), tb = t(b);
+        if (ta != null && tb != null && tb - ta > 120000) break;
+        var d = hamming(a.hash, b.hash);
+        var same = d <= 2 && (ta == null || tb == null || Math.abs(tb - ta) < 3600000), near = d <= 10 && ta != null && tb != null && Math.abs(tb - ta) <= 120000;
+        if (!same && !near) continue;
+        var lose = b.sharp > a.sharp ? a : b, win = lose === a ? b : a;
+        lose.tidy = same ? (lose.sharp < win.sharp * 0.5 ? "blur" : "repeat") : "similar"; lose.twin = win;
+        if (lose === a) a = b;
+      }
+    }
+    ph.forEach(function (p) { if (!p.tidy && p.sharp < blurLine) p.tidy = "blur"; });
+  }
+  function kept(p) { return rb.noTidy || !p.tidy || p.keep; }
+  function tidyPanel() {
+    if (rb.noTidy && !rb.photos.some(function (p) { return p.tidy; })) return "";
+    var by = { blur: [], repeat: [], similar: [] };
+    rb.photos.forEach(function (p) { if (p.tidy) by[p.tidy].push(p); });
+    var n = by.blur.length + by.repeat.length + by.similar.length;
+    if (!n) return '<div class="rb-tidy"><p class="tag">Tidy-up: no blurry photos, repeats or near-same shots found.</p></div>';
+    var left = rb.photos.filter(function (p) { return p.tidy && !p.keep; }).length;
+    var sect = function (key, title, text) {
+      var list = by[key]; if (!list.length) return "";
+      return '<div class="rb-tidy-sec"><h4>' + title + ' <span class="muted">' + list.length + '</span></h4><p class="tag">' + text + '</p><div class="thumbs">' +
+        list.slice(0, 120).map(function (p) {
+          var i = rb.photos.indexOf(p);
+          return '<label class="rb-tidy-pic' + (p.keep ? " kept" : "") + '">' + (p.thumb ? '<img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy">' : '<span class="ph"><small>' + esc(p.name) + '</small></span>') +
+            '<span class="check"><input type="checkbox" class="rb-keep" data-i="' + i + '"' + (p.keep ? " checked" : "") + '> Keep</span></label>';
+        }).join("") + '</div>' + (list.length > 120 ? '<p class="tag">and ' + (list.length - 120) + ' more like these.</p>' : "") +
+        '<button class="btn small rb-keep-all" type="button" data-kind="' + key + '">Keep all of these</button></div>';
+    };
+    return '<div class="rb-tidy"><h3>Tidy-up</h3><p>' + (rb.noTidy ? "Tidy-up is off, so every photo goes in the album. " :
+      'We set aside ' + left + (left < n ? ' of ' + n : '') + ' photos so the album only has the good ones: ' +
+      [by.blur.length ? by.blur.length + " blurry" : "", by.repeat.length ? by.repeat.length + " repeats" : "", by.similar.length ? by.similar.length + " nearly the same as another shot (we kept the sharpest)" : ""].filter(Boolean).join(", ") +
+      '. Nothing is deleted from your device. Tick Keep on any you want back.') + '</p>' +
+      '<details><summary>Look at the photos set aside</summary>' +
+      sect("blur", "Blurry", "Out of focus or shaky, or a blurrier copy of a shot we kept. Very plain photos (sky, a wall) can show up here too.") +
+      sect("repeat", "Repeats", "The same photo added twice, or a copy of one already in the list.") +
+      sect("similar", "Nearly the same", "Taken within two minutes and looking almost the same as a sharper shot we kept.") +
+      '</details><label class="check"><input type="checkbox" id="rb-notidy"' + (rb.noTidy ? " checked" : "") + '> Turn tidy-up off and keep every photo</label></div>';
   }
   // Smaller copies when there are many photos, so the holiday files stay a size GitHub accepts.
   function photoSize(n) { return n > 1500 ? { max: 960, q: 0.68 } : n > 400 ? { max: 1200, q: 0.72 } : { max: 1400, q: 0.8 }; }
@@ -726,7 +812,13 @@
           var s = c.toDataURL("image/jpeg", q); c.width = c.height = 0; return s;
         };
         var res = null;
-        try { res = { data: draw(size.max, size.q), thumb: draw(240, 0.7) }; } catch (e) { res = null; }
+        try {
+          res = { data: draw(size.max, size.q) };
+          var k = Math.min(1, 240 / Math.max(w, h)), c = document.createElement("canvas"), g;
+          c.width = Math.round(w * k); c.height = Math.round(h * k); g = c.getContext("2d"); g.drawImage(img, 0, 0, c.width, c.height);
+          var f = looks(g.getImageData(0, 0, c.width, c.height)); res.sharp = f.sharp; res.hash = f.hash;
+          res.thumb = c.toDataURL("image/jpeg", 0.7); c.width = c.height = 0;
+        } catch (e) { res = null; }
         URL.revokeObjectURL(url); img.src = "";
         resolve(res);
       };
@@ -746,7 +838,7 @@
       if (tags && typeof tags.latitude === "number" && typeof tags.longitude === "number") { item.lat = +tags.latitude.toFixed(5); item.lon = +tags.longitude.toFixed(5); }
       return item.heic ? null : shrinkPhoto(file, size);
     }).then(function (res) {
-      if (res) { item.data = res.data; item.thumb = res.thumb; }
+      if (res) { item.data = res.data; item.thumb = res.thumb; item.sharp = res.sharp; item.hash = res.hash; }
       return item;
     }, function () { return item; });
   }
@@ -765,7 +857,7 @@
       (T.days || []).forEach(function (d, i) { dayOf[d.date] = { day: d, n: i + 1 }; (d.places || []).forEach(function (p) { all.push({ name: p.name, lat: p.lat, lon: p.lon, dayN: i + 1 }); }); });
       (T.stays || []).forEach(function (s) { all.push({ name: s.name, lat: s.lat, lon: s.lon, stay: true }); });
     }
-    rb.photos.forEach(function (p) {
+    rb.photos.filter(kept).forEach(function (p) {
       var info = T && dayOf[p.date], anchor = null, how = "";
       if (T && p.lat != null) {
         var m = info && nearestStop((info.day.places || []).map(function (x) { return { name: x.name, lat: x.lat, lon: x.lon }; }), p.lat, p.lon, 1.5);
@@ -909,7 +1001,7 @@
       withGps + ' have a place saved in them. ' + (guessed ? guessed + ' have no date inside, so we used the file date, which may be wrong. ' : "") +
       (T ? gs.filter(function (g) { return g.anchor; }).reduce(function (n, g) { return n + g.photos.length; }, 0) + ' matched a planned stop.' : gs.length + ' stops over ' + Object.keys(gs.reduce(function (o, g) { o[g.date] = 1; return o; }, {})).length + ' days.') + '</div>' +
       '<div class="row" style="margin-top:12px"><button class="btn" id="rb-lookup" type="button">Look up place names online</button>' +
-      '<button class="btn" id="rb-clear" type="button">Start again</button><span class="tag" id="rb-lookup-msg"></span></div>' + ytHelpPanel();
+      '<button class="btn" id="rb-clear" type="button">Start again</button><span class="tag" id="rb-lookup-msg"></span></div>' + tidyPanel() + ytHelpPanel();
     var cities = T ? {} : dayCities(gs);
     if (T) {
       (T.days || []).forEach(function (d, n) {
@@ -950,6 +1042,10 @@
       el.addEventListener("input", function () { rb.photos[+el.dataset.i].link = el.value.trim(); if (linkEl && linkEl !== el) flushLink(); linkEl = el; clearTimeout(linkTimer); linkTimer = setTimeout(flushLink, 300); });
       el.addEventListener("change", flushLink); el.addEventListener("blur", flushLink);
     });
+    out.querySelectorAll(".rb-keep").forEach(function (el) { el.addEventListener("change", function () { rb.photos[+el.dataset.i].keep = el.checked; drawGroups(); }); });
+    out.querySelectorAll(".rb-keep-all").forEach(function (el) { el.addEventListener("click", function () { rb.photos.forEach(function (p) { if (p.tidy === el.dataset.kind) p.keep = true; }); drawGroups(); }); });
+    var nt = out.querySelector("#rb-notidy");
+    if (nt) nt.addEventListener("change", function () { rb.noTidy = nt.checked; drawGroups(); });
     var ytMatch = out.querySelector("#rb-yt-match");
     if (ytMatch) ytMatch.addEventListener("click", function () {
       var msg = matchLinks(out.querySelector("#rb-yt-all").value, out.querySelector("#rb-yt-newest").checked);
@@ -1100,7 +1196,7 @@
     rb.plan = { hol: hol, parts: parts, names: names, id: id };
     rb.built = null;
     var listLine = names.map(function (n) { return '"' + esc(n) + '",'; }).join("</code> <code>");
-    var skipped = rb.photos.filter(function (p) { return !p.data; }).length;
+    var skipped = rb.photos.filter(function (p) { return kept(p) && !p.data; }).length;
     steps.innerHTML = '<div><b>Save the holiday ' + (names.length > 1 ? names.length + ' files' : 'file') + '</b><p class="muted">Press <b>Save holiday file</b> below. Your photos are inside, locked with your passkey, with their hidden phone data removed.' +
       (names.length > 1 ? ' There are ' + hol.memories.length + ' photos, so they are split into ' + names.length + ' files.' : '') +
       (skipped ? ' ' + skipped + ' photos could not be added (iPhone HEIC photos, or files the browser could not open). Change them to JPG first.' : '') + '</p></div>' +
@@ -1111,7 +1207,7 @@
   }
   // Lock each part with the passkey, one after another, showing progress.
   function buildFiles(msg) {
-    var todo = rb.photos.filter(function (p) { return p.video && p.fav && !p.clip && p.file; });
+    var todo = rb.photos.filter(function (p) { return kept(p) && p.video && p.fav && !p.clip && p.file; });
     if (todo.length) {
       return todo.reduce(function (chain, p, i) {
         return chain.then(function () {

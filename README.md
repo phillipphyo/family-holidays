@@ -41,6 +41,10 @@ Thousands of photos are fine. The page reads them a few at a time and shows how 
 
 At the top, say what the photos are for. **A trip already in the album** matches each photo to the stop planned for that day (for example Fushimi Inari on Day 2). **A past trip with no plan** builds the days, stops and route from where and when each photo was taken.
 
+### Tidy-up
+
+After reading, the page sets aside blurry photos, repeats (the same photo added twice, or a copy), and bursts of nearly the same shot taken within two minutes, keeping the sharpest. Nothing is deleted. Open **Look at the photos set aside** and tick **Keep** on any you want back, or turn tidy-up off.
+
 ### Videos
 
 - Every video (MP4 or MOV) gets a still picture in its day and stop.
