@@ -767,7 +767,11 @@
     }
     ph.forEach(function (p) { if (!p.tidy && p.sharp < blurLine) p.tidy = "blur"; });
   }
-  function kept(p) { return rb.noTidy || !p.tidy || p.keep; }
+  function leftOutNote() {
+    var n = rb.photos.filter(function (p) { return p.out; }).length;
+    return n ? '<div class="notice rb-left-out" role="status">' + countText(rb.photos.filter(function (p) { return p.out; })) + ' left out by you. They won\'t go in the album. <button class="btn small" type="button" id="rb-put-back">Put them all back</button></div>' : "";
+  }
+  function kept(p) { return !p.out && (rb.noTidy || !p.tidy || p.keep); }
   function tidyPanel() {
     if (rb.noTidy && !rb.photos.some(function (p) { return p.tidy; })) return "";
     var by = { blur: [], repeat: [], similar: [] };
@@ -910,12 +914,13 @@
     return '<div class="group' + (fixed ? " matched" : "") + '"><div class="head">' +
       (fixed ? '<h4 class="rb-stop"><span class="rb-pin" aria-hidden="true">✓</span>' + esc(g.anchor) + '</h4>'
              : '<input type="text" id="rb-name-' + i + '" data-key="' + esc(g.key) + '" class="rb-name" value="' + esc(rb.names[g.key] || "") + '" placeholder="Place name" aria-label="Place name">') +
+      '<button class="btn small rb-out-stop" type="button" data-key="' + esc(g.key) + '">Leave out this stop</button>' +
       '<span class="tag">' + countText(g.photos) + ' · ' + esc(g.suggest.how) +
       (g.lat != null ? ' · <a href="https://www.google.com/maps/search/?api=1&query=' + g.lat + ',' + g.lon + '" target="_blank" rel="noopener noreferrer">see on map</a>' : "") + '</span></div>' +
       '<input type="text" id="rb-note-' + i + '" data-key="' + esc(g.key) + '" class="rb-note" value="' + esc(rb.notes[g.key] || "") + '" placeholder="A note, for example: Ice cream by the river" aria-label="Note for ' + esc(rb.names[g.key] || "this stop") + '">' +
       videoRow(g) +
       '<div class="thumbs">' + g.photos.filter(function (p) { return !p.video; }).slice(0, SHOW_THUMBS).map(function (p) {
-        return '<div>' + (p.thumb ? '<div class="pic loaded"><img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy"></div>' : '<div class="pic"><div class="ph"><small>' + (p.heic ? "iPhone photo" : "Can't show") + '</small>' + esc(p.name) + '</div></div>') +
+        return '<div class="rb-thumb"><button class="rb-x" type="button" data-i="' + rb.photos.indexOf(p) + '" aria-label="Leave out ' + esc(p.name) + '" title="Leave out this photo">×</button>' + (p.thumb ? '<div class="pic loaded"><img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy"></div>' : '<div class="pic"><div class="ph"><small>' + (p.heic ? "iPhone photo" : "Can't show") + '</small>' + esc(p.name) + '</div></div>') +
           '<span class="tag">' + esc(p.time || "") + ' ' + esc(p.name) + '</span></div>';
       }).join("") + '</div>' + (g.photos.filter(function (p) { return !p.video; }).length > SHOW_THUMBS ? '<p class="tag">and ' + (g.photos.filter(function (p) { return !p.video; }).length - SHOW_THUMBS) + ' more photos in this group, all included</p>' : "") + '</div>';
   }
@@ -1001,7 +1006,7 @@
       withGps + ' have a place saved in them. ' + (guessed ? guessed + ' have no date inside, so we used the file date, which may be wrong. ' : "") +
       (T ? gs.filter(function (g) { return g.anchor; }).reduce(function (n, g) { return n + g.photos.length; }, 0) + ' matched a planned stop.' : gs.length + ' stops over ' + Object.keys(gs.reduce(function (o, g) { o[g.date] = 1; return o; }, {})).length + ' days.') + '</div>' +
       '<div class="row" style="margin-top:12px"><button class="btn" id="rb-lookup" type="button">Look up place names online</button>' +
-      '<button class="btn" id="rb-clear" type="button">Start again</button><span class="tag" id="rb-lookup-msg"></span></div>' + tidyPanel() + ytHelpPanel();
+      '<button class="btn" id="rb-clear" type="button">Start again</button><span class="tag" id="rb-lookup-msg"></span></div>' + leftOutNote() + tidyPanel() + ytHelpPanel();
     var cities = T ? {} : dayCities(gs);
     if (T) {
       (T.days || []).forEach(function (d, n) {
@@ -1020,7 +1025,7 @@
     } else {
       var lastDate = "", dn = 0;
       gs.forEach(function (g, i) {
-        if (g.date !== lastDate) { dn++; html += '<div class="rb-day"><h3>Day ' + dn + ' · ' + esc(nice(g.date, true)) + '</h3>' + (cities[g.date] ? '<p class="muted">In ' + esc(cities[g.date]) + '</p>' : "") + '</div>'; lastDate = g.date; }
+        if (g.date !== lastDate) { dn++; html += '<div class="rb-day"><div class="row"><h3>Day ' + dn + ' · ' + esc(nice(g.date, true)) + '</h3><button class="btn small rb-out-day" type="button" data-date="' + esc(g.date) + '">Leave out this day</button></div>' + (cities[g.date] ? '<p class="muted">In ' + esc(cities[g.date]) + '</p>' : "") + '</div>'; lastDate = g.date; }
         html += groupCard(g, i);
       });
     }
@@ -1044,6 +1049,11 @@
     });
     out.querySelectorAll(".rb-keep").forEach(function (el) { el.addEventListener("change", function () { rb.photos[+el.dataset.i].keep = el.checked; drawGroups(); }); });
     out.querySelectorAll(".rb-keep-all").forEach(function (el) { el.addEventListener("click", function () { rb.photos.forEach(function (p) { if (p.tidy === el.dataset.kind) p.keep = true; }); drawGroups(); }); });
+    out.querySelectorAll(".rb-x").forEach(function (el) { el.addEventListener("click", function () { rb.photos[+el.dataset.i].out = true; drawGroups(); }); });
+    out.querySelectorAll(".rb-out-stop").forEach(function (el) { el.addEventListener("click", function () { var g = gs.filter(function (x) { return x.key === el.dataset.key; })[0]; if (g) g.photos.forEach(function (p) { p.out = true; }); drawGroups(); }); });
+    out.querySelectorAll(".rb-out-day").forEach(function (el) { el.addEventListener("click", function () { rb.photos.forEach(function (p) { if (p.date === el.dataset.date) p.out = true; }); drawGroups(); }); });
+    var pb = out.querySelector("#rb-put-back");
+    if (pb) pb.addEventListener("click", function () { rb.photos.forEach(function (p) { delete p.out; }); drawGroups(); });
     var nt = out.querySelector("#rb-notidy");
     if (nt) nt.addEventListener("change", function () { rb.noTidy = nt.checked; drawGroups(); });
     var ytMatch = out.querySelector("#rb-yt-match");

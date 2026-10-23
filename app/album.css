@@ -598,3 +598,14 @@ figure.vid a { display: block; color: inherit; }
 .rb-tidy-pic img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px; opacity: .6; display: block; }
 .rb-tidy-pic.kept img { opacity: 1; box-shadow: 0 0 0 2px var(--indigo); }
 .rb-tidy-sec .btn { justify-self: start; }
+
+/* Leave out: a small × on each photo, and buttons for a whole stop or day */
+.rb-thumb { position: relative; }
+.rb-x {
+  position: absolute; top: 4px; right: 4px; z-index: 2; width: 28px; height: 28px; border-radius: 50%; padding: 0;
+  display: grid; place-items: center; font: 600 16px/1 var(--body); color: #fff; background: rgba(10, 14, 28, .7); border: 1px solid rgba(255, 255, 255, .6); cursor: pointer;
+}
+.rb-x:hover { background: rgba(176, 0, 32, .85); }
+@media (pointer: coarse) { .rb-x { width: 36px; height: 36px; } }
+.rb-day .row { justify-content: space-between; align-items: center; gap: 10px; }
+.group .head .rb-out-stop { order: 3; }
