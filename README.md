@@ -60,6 +60,13 @@ Good to know:
 - iPhone HEIC photos are read for date and place, but most browsers can't show them. Change them to JPG first if you want to see them in the album (on iPhone: Settings, Camera, Formats, Most Compatible).
 - The album shows each photo's place only to about 100 metres, inside the locked file.
 
+## Location's information (past trips)
+
+A past trip built from photos has no plan, so each stop gets its facts in two ways:
+
+- **From our photos**, worked out on the page: our own photo on the stop's card, when we were there (for example "Sat 12 Jul, 10:05 to 11:40 · 23 photos"), "Our photos here" to open them, and each day's journeys as a best guess from the distance and the time between photos (marked "Likely").
+- **From Claude**, like the Japan plan: on the holiday page open **Location's information**, press **Copy the stop list for Claude** (names, dates and rough spots only, no photos), paste it to Claude, paste the reply back and press **Add it to the page**. Then **Save the information file** (`<id>.info.js`, locked with the passkey) and **Download the new list.js**, and put both in `holidays/`. Each stop then has a **Location's information** button with what it is, when we were there, the best time to go, good to know, and if we go again.
+
 ## Pictures
 
 Each stop shows a photo from Wikimedia Commons or Wikipedia, labelled with who took it and its licence. The photos are saved inside the locked holiday file.

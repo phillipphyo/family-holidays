@@ -156,8 +156,13 @@
 
   // "Why we picked it" and "Photo spots" open in a pop-up over the page.
   var moreList = [];
-  function moreButton(p, city) {
+  function moreButton(p, city, past) {
     var out = "";
+    if (past) {
+      if (p.info) { moreList.push({ p: p, kind: "info", city: city, past: past }); out += '<button class="more-btn why" type="button" aria-haspopup="dialog" data-more="' + (moreList.length - 1) + '"><span aria-hidden="true">✦</span>Location\'s information</button>'; }
+      out += past.photos || "";
+      return out ? '<div class="more-bar">' + out + '</div>' : "";
+    }
     if (p.more) { moreList.push({ p: p, kind: "why", city: city }); out += '<button class="more-btn why" type="button" aria-haspopup="dialog" data-more="' + (moreList.length - 1) + '"><span aria-hidden="true">✦</span>Why we picked it</button>'; }
     if (p.spots) { moreList.push({ p: p, kind: "spots", city: city }); out += '<button class="more-btn spots" type="button" aria-haspopup="dialog" data-more="' + (moreList.length - 1) + '"><span aria-hidden="true">◎</span>Photo spots</button>'; }
     return out ? '<div class="more-bar">' + out + '</div>' : "";
@@ -186,34 +191,36 @@
     return d;
   }
   function openMore(entry) {
-    var p = entry.p, spots = entry.kind === "spots", d = moreDialog();
+    var p = entry.p, spots = entry.kind === "spots", info = entry.kind === "info", d = moreDialog();
     d._opener = document.activeElement;
-    var m = spots ? p.spots : p.more, hotel = !!(p.nights || p.type === "hotel");
+    var m = spots ? p.spots : info ? p.info : p.more, hotel = !!(p.nights || p.type === "hotel");
     var row = function (label, text, cls) { return text ? '<div class="more-row' + (cls ? " " + cls : "") + '"><h3 class="more-label">' + label + '</h3><p>' + esc(text) + '</p></div>' : ""; };
     // A hotel shows a photo here only when it is the hotel itself, never an area view.
     var img = "", cr = null;
-    if (spots && m.image) { img = m.image; cr = m.credit; }
+    if (info && entry.past.pic) { img = entry.past.pic.image || entry.past.pic.thumb; }
+    else if (spots && m.image) { img = m.image; cr = m.credit; }
     else if (!hotel || p.hotelPhoto) {
       img = p.image || (p.wiki && ((window.ALBUM_IMAGES || {})[p.wiki] || wikiCache[p.wiki])) || "";
       cr = p.image ? p.credit : null;
     }
-    var credit = !img ? "" : cr ? '<a class="credit" href="' + u(cr.url) + '" target="_blank" rel="noopener noreferrer">' + esc(creditText(cr, spots && m.image ? "Example photo" : "Photo")) + '</a>'
+    var credit = !img || (info && entry.past.pic) ? "" : cr ? '<a class="credit" href="' + u(cr.url) + '" target="_blank" rel="noopener noreferrer">' + esc(creditText(cr, spots && m.image ? "Example photo" : "Photo")) + '</a>'
       : p.wiki ? '<a class="credit" href="https://en.wikipedia.org/wiki/' + esc(encodeURIComponent(p.wiki.replace(/ /g, "_"))) + '" target="_blank" rel="noopener noreferrer">Photo from Wikipedia</a>' : "";
     var where = (p.nights ? [p.city, p.nights] : [p.city || entry.city, TYPE_LABEL[p.type]]).filter(Boolean).join(" · ");
     var note = hotel && !img ? '<span class="more-note">No free photo of this hotel yet. Tap Photos below to see it.</span>' : "";
     var lead = function (label, text) { return text ? '<div class="more-row first">' + (label ? '<h3 class="more-label">' + label + '</h3>' : "") + '<p class="more-lead" id="more-lead">' + esc(text) + '</p></div>' : ""; };
     var body = spots
       ? lead("Where to stand", m.spots) + row("Poses to try", m.poses) + row("Camera angle", m.angles) + row("Best light", m.light) + row("Beat the crowds", m.crowds)
+      : info ? lead("", m.lead) + row("What it is", m.what) + row("When we were there", entry.past.visit) + row("Best time to go", m.best) + row("Good to know", m.tips) + row("If we go again", m.again)
       : lead("", m.why) + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + row("Skip it if", m.skip, "skip");
     var foot = spots
       ? '<div class="links seg"><a class="btn" href="' + u("https://www.google.com/search?tbm=isch&q=" + q(p.name + " best photo spot")) + '" target="_blank" rel="noopener noreferrer">More example photos</a>' +
         (m.tag ? '<a class="btn" href="' + u("https://www.instagram.com/explore/tags/" + encodeURIComponent(m.tag) + "/") + '" target="_blank" rel="noopener noreferrer">#' + esc(m.tag) + ' on Instagram</a>' : "") + '</div>'
-      : linkRow(p, { primaryPhotos: !!note }) + infoLink(p);
+      : linkRow(p, { primaryPhotos: !!note }) + (info && m.wiki ? '<a class="info-link" href="https://en.wikipedia.org/wiki/' + esc(encodeURIComponent(m.wiki.replace(/ /g, "_"))) + '" target="_blank" rel="noopener noreferrer">More on Wikipedia <span aria-hidden="true">↗</span></a>' : infoLink(p));
     d.innerHTML = '<div class="more-box' + (spots ? " is-spots" : "") + '">' +
       '<button class="more-close" type="button" data-close aria-label="Close"><span aria-hidden="true">✕</span></button>' +
       '<div class="more-scroll"><header class="more-hero' + (img ? "" : " no-pic") + '" style="--tone:' + tone(p.type || "hotel") + '">' +
         (img ? '<img src="' + u(img) + '" alt="' + esc(spots && m.image ? "Example photo taken at " + p.name : p.name) + '">' : "") + credit +
-        '<div class="more-title"><span class="more-kicker">' + (spots ? "Photo spots" : "Why we picked it") + '</span><h2 id="more-title">' + esc(p.name) + '</h2>' +
+        '<div class="more-title"><span class="more-kicker">' + (spots ? "Photo spots" : info ? "Location's information" : "Why we picked it") + '</span><h2 id="more-title">' + esc(p.name) + '</h2>' +
         (where ? '<span class="more-where">' + esc(where) + '</span>' : "") + note + '</div></header>' +
       '<div class="more-body">' + body + '</div></div><footer class="more-foot">' + foot + '</footer></div>';
     var hi = d.querySelector(".more-hero img");
@@ -290,7 +297,7 @@
     var nights = nDays - 1;
     var cities = (h.route || []).filter(function (r, i, a) { return r.nights != null; }).length;
     var placeCount = (h.days || []).reduce(function (n, d) { return n + (d.places || []).length; }, 0);
-    var byDate = {};
+    var byDate = {}, past = isPastTrip(h), visits = past ? visitsFor(h) : {};
     (h.memories || []).forEach(function (m) { (byDate[m.date] = byDate[m.date] || []).push(m); });
 
     var html = '<section class="cover">' + pic({ image: h.cover.image, wiki: h.cover.wiki, credit: h.cover.credit, name: h.title }) +
@@ -304,7 +311,7 @@
       ((h.memories || []).length ? '<div><span class="eyebrow">Photos</span><b>' + h.memories.length + '</b></div>' : "") + '</div>' +
       (h.walkingTotal ? '<p class="muted walk-total">' + esc(h.walkingTotal) + '</p>' : "") +
       ((h.journeyTips || []).length ? '<div class="tipbox"><h4><span aria-hidden="true">🚆</span> Getting around, every day</h4><ul>' + h.journeyTips.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>' +
-        (h.journeyNote ? '<p class="muted">' + esc(h.journeyNote) + '</p>' : "") + '</div>' : "") +
+        (h.journeyNote ? '<p class="muted">' + esc(h.journeyNote) + '</p>' : "") + '</div>' : "") + (past ? infoBox(h) : "") +
       '<div class="summary">' + (h.travellers ? '<p class="eyebrow">' + esc(h.travellers) + '</p>' : "") + (h.summary ? '<p>' + esc(h.summary) + '</p>' : "") +
       ((h.links || []).length ? '<div class="links">' + h.links.map(function (l, i) { return '<a class="btn' + (i ? "" : " primary") + '" href="' + u(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.label) + '</a>'; }).join("") + '</div>' : "") + '</div>';
 
@@ -336,13 +343,19 @@
         '<div class="meta">' + (d.city ? '<span>In <b>' + esc(d.city) + '</b></span>' : "") + (d.sleep ? '<span>Sleep at <b>' + esc(d.sleep) + '</b></span>' : "") + '</div>' +
         (d.travel ? '<p class="travel">' + esc(d.travel) + '</p>' : "") +
         (d.walk || d.ifTired ? '<div class="walk">' + (d.walk ? '<span><b>Walking</b> ' + esc(d.walk) + '</span>' : "") + (d.ifTired ? '<span><b>If tired</b> ' + esc(d.ifTired) + '</span>' : "") + '</div>' : "") +
-        journeyList(d.journeys) +
+        (past && !(d.journeys || []).length ? journeyList(likelyJourneys(h, i), "Journeys, our best guess from the photos") : journeyList(d.journeys)) +
         (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") +
         '</div></div>';
       var shots = {};
       mem.forEach(function (m) { if (m.stop) shots[m.stop] = (shots[m.stop] || 0) + 1; });
       if ((d.places || []).length) {
-        html += '<div class="places">' + d.places.map(function (p) {
+        html += '<div class="places">' + d.places.map(function (p, pi) {
+          var vk = (i + 1) + "." + (pi + 1), v = past && visits[vk], own = v && v.pic;
+          if (past) return '<div class="place">' + pic({ image: own ? own.thumb || own.image : p.image, wiki: own ? "" : p.wiki, name: p.name, type: p.type, decorative: true }) +
+            '<div class="body"><div class="top"><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
+            (v && v.first ? '<span class="time">' + esc(v.first + (v.last && v.last !== v.first ? " to " + v.last : "")) + '</span>' : "") + (v ? '<span class="time">📷 ' + v.mems.length + '</span>' : "") + '</div>' +
+            '<h4>' + esc(p.name) + '</h4>' + (p.info && p.info.lead ? '<p class="note">' + esc(p.info.lead) + '</p>' : "") +
+            '<div class="card-actions">' + moreButton(p, d.city, { visit: visitText(d, v), pic: own, photos: own ? '<button class="more-btn spots place-photos" type="button" data-h="' + esc(h.id) + '" data-k="' + vk + '"><span aria-hidden="true">◎</span>Our photos here</button>' : "" }) + linkRow(p) + '</div></div></div>';
           return '<div class="place">' + pic({ image: p.image, wiki: p.wiki, credit: p.credit, name: p.name, type: p.type, area: p.areaPhoto, decorative: true }) +
             '<div class="body"><div class="top"><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
             (p.time ? '<span class="time">' + esc(p.time) + '</span>' : "") + (shots[p.name] ? '<span class="time">📷 ' + shots[p.name] + '</span>' : "") + '</div>' +
@@ -374,9 +387,9 @@
     return frame(h.id, html);
   }
   // Each ride as "how: time, how often, cost", with the part before the first colon in bold.
-  function journeyList(list) {
+  function journeyList(list, title) {
     if (!(list || []).length) return "";
-    return '<div class="journeys"><h4><span aria-hidden="true">🚆</span> Journeys</h4><ul>' + list.map(function (j) {
+    return '<div class="journeys"><h4><span aria-hidden="true">🚆</span> ' + esc(title || "Journeys") + '</h4><ul>' + list.map(function (j) {
       var i = j.indexOf(": ");
       return '<li>' + (i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j)) + '</li>';
     }).join("") + '</ul></div>';
@@ -533,8 +546,8 @@
     d.querySelector('[data-lb="next"]').disabled = lbAt === lbList.length - 1;
   }
   function stepPhoto(n) { var k = lbAt + n; if (k < 0 || k >= lbList.length) return; lbAt = k; viewer().classList.remove("zoomed"); showPhoto(); }
-  function openPhoto(mid, opener) {
-    var m = memReg[mid]; if (!m) return;
+  function openPhoto(mid, opener) { if (memReg[mid]) openPhotoMem(memReg[mid], opener); }
+  function openPhotoMem(m, opener) {
     var h = holidays.filter(function (x) { return x.memories && x.memories.indexOf(m) >= 0; })[0];
     lbList = (h ? h.memories : memReg).filter(function (x) { return x.kind !== "video"; });
     lbAt = Math.max(0, lbList.indexOf(m));
@@ -1820,11 +1833,179 @@
         if (rt) retryParts(rt.getAttribute("data-retry"));
         var mm = e.target.closest && e.target.closest(".mem-more");
         if (mm) showMore(mm);
+        var ib = e.target.closest && e.target.closest(".info-copy, .info-check, .info-save, .info-list");
+        if (ib) infoClick(ib);
+        var sp = e.target.closest && e.target.closest(".place-photos");
+        if (sp) openStopPhotos(sp);
       });
     }
     render();
   }
   var begun = false;
+
+  // ---------- Location's information (past trips built from photos) ----------
+  // A past trip has no plan, so each stop's facts come from our photos (when we were there, how we likely got there)
+  // and from an information file Claude writes, locked like the photos (holidays/<id>.info.js).
+  var infoPacks = [], infoDraft = null;
+  var INFO_FIELDS = ["lead", "what", "best", "tips", "again", "wiki"];
+  function isPastTrip(h) {
+    return (h.memories || []).length > 0 && !(h.days || []).some(function (d) { return (d.places || []).some(function (p) { return p.more; }); });
+  }
+  // Which of our photos belong to which stop: same name first (a repeated name has ", stop 2" added), then the nearest stop.
+  function visitsFor(h) {
+    if (h._visits && h._visits.n === h.memories.length) return h._visits.map;
+    var map = {};
+    (h.days || []).forEach(function (d, di) {
+      var mems = h.memories.filter(function (m) { return m.date === d.date; });
+      mems.forEach(function (m) {
+        var best = -1, bd = 1e9;
+        (d.places || []).forEach(function (p, pi) {
+          var named = m.place && (p.name === m.place || p.name.indexOf(m.place + ", stop ") === 0);
+          var km = p.lat != null && m.lat != null ? distKm(p.lat, p.lon, m.lat, m.lon) : named ? 0 : 1e6;
+          var score = named ? km : km + 1000;
+          if (score < bd && (named || km < 2)) { bd = score; best = pi; }
+        });
+        if (best < 0) return;
+        var k = (di + 1) + "." + (best + 1), v = map[k] = map[k] || { mems: [], first: "", last: "" };
+        v.mems.push(m);
+        if (m.time && (!v.first || m.time < v.first)) v.first = m.time;
+        if (m.time && m.time > v.last) v.last = m.time;
+        if (!v.pic && m.kind !== "video" && (m.thumb || m.image)) v.pic = m;
+      });
+    });
+    h._visits = { n: h.memories.length, map: map };
+    return map;
+  }
+  function visitText(d, v) {
+    if (!v) return "";
+    return nice(d.date, true) + (v.first ? ", " + v.first + (v.last && v.last !== v.first ? " to " + v.last : "") : "") + " · " + countText(v.mems.map(function (m) { return { video: m.kind === "video" }; }));
+  }
+  // Our best guess of how we got from one stop to the next, from the distance and the time between photos.
+  function likelyJourneys(h, di) {
+    var d = h.days[di], vs = visitsFor(h), out = [];
+    var stops = (d.places || []).map(function (p, pi) { return { p: p, v: vs[(di + 1) + "." + (pi + 1)] }; }).filter(function (s) { return s.p.lat != null && s.v; });
+    stops.sort(function (a, b) { return (a.v.first || "") < (b.v.first || "") ? -1 : 1; });
+    var mins = function (t) { var x = String(t || "").split(":"); return x.length > 1 ? +x[0] * 60 + +x[1] : null; };
+    for (var i = 1; i < stops.length; i++) {
+      var a = stops[i - 1], b = stops[i], km = distKm(a.p.lat, a.p.lon, b.p.lat, b.p.lon) * 1.3;
+      if (km < 0.3) continue;
+      var t0 = mins(a.v.last), t1 = mins(b.v.first), gap = t0 != null && t1 != null && t1 > t0 ? t1 - t0 : null;
+      var speed = gap ? km / (gap / 60) : null;
+      var how = speed != null ? (speed < 6 ? "On foot" : speed < 40 ? "By metro, tram or bus" : speed < 200 ? "By car or train" : "By plane")
+        : (km < 2 ? "On foot" : km < 15 ? "By metro, tram or bus" : km < 400 ? "By car or train" : "By plane");
+      out.push("Likely " + how.toLowerCase() + ", " + a.p.name + " to " + b.p.name + ": about " + (km < 10 ? km.toFixed(1) : Math.round(km)) + " km" +
+        (gap ? ", " + (gap < 90 ? gap + " minutes" : Math.round(gap / 6) / 10 + " hours") + " between the last photo at one and the first at the next" : "") + ".");
+    }
+    return out;
+  }
+  function cleanInfo(x) {
+    var o = {};
+    if (!x || typeof x !== "object") return null;
+    INFO_FIELDS.forEach(function (f) { if (x[f] != null && String(x[f]).trim()) o[f] = String(x[f]).trim().slice(0, f === "wiki" ? 120 : 700); });
+    if (TYPE_LABEL[x.type]) o.type = x.type;
+    return Object.keys(o).length ? o : null;
+  }
+  function applyInfo(h, pack) {
+    var n = 0;
+    Object.keys(pack.places || {}).forEach(function (k) {
+      var m = /^(\d+)\.(\d+)$/.exec(k), info = cleanInfo(pack.places[k]);
+      if (!m || !info) return;
+      var d = (h.days || [])[+m[1] - 1], p = d && (d.places || [])[+m[2] - 1];
+      if (!p) return;
+      if (info.type) { p.type = info.type; delete info.type; }
+      if (info.wiki && !p.wiki) p.wiki = info.wiki;
+      p.info = info; n++;
+    });
+    Object.keys(pack.days || {}).forEach(function (k) {
+      var d = (h.days || [])[+k - 1], t = pack.days[k] && pack.days[k].title;
+      if (d && t) d.title = String(t).trim().slice(0, 120);
+    });
+    h._info = pack;
+    return n;
+  }
+  function mergeInfo() {
+    infoPacks.splice(0).forEach(function (pack) {
+      var h = holidays.filter(function (x) { return x.id === pack.infoFor; })[0];
+      if (h) applyInfo(h, pack); else infoPacks.push(pack);
+    });
+  }
+  function placeList(h) {
+    var vs = visitsFor(h), rows = [];
+    (h.days || []).forEach(function (d, di) {
+      (d.places || []).forEach(function (p, pi) {
+        var k = (di + 1) + "." + (pi + 1), v = vs[k];
+        rows.push({ key: k, date: d.date, city: d.city || "", name: p.name, near: p.lat != null ? p.lat.toFixed(3) + "," + p.lon.toFixed(3) : "", when: v ? visitText(d, v) : "" });
+      });
+    });
+    return "Please write Location's information for each stop of our past trip \"" + h.title + "\", in plain simple English, in the same style as our Japan plan. " +
+      "If a name is \"Somewhere nice\" or a street, work out the place from the city and the rough spot, and say so in lead. " +
+      "Reply with JSON only, shaped like this:\n" +
+      '{"days":{"1":{"title":"A short title for the day"}},"places":{"1.1":{"type":"sight|food|shopping|nature|hotel|station|airport","lead":"One or two sentences: what this place is.","what":"What there is to see or do.","best":"Best time to go.","tips":"Good to know.","again":"If we go again.","wiki":"English Wikipedia page title"}}}\n\n' +
+      "The stops (key, date, city, name, rough spot, when we were there):\n" + JSON.stringify(rows, null, 1);
+  }
+  function infoBox(h) {
+    var all = 0, have = 0;
+    (h.days || []).forEach(function (d) { (d.places || []).forEach(function (p) { all++; if (p.info) have++; }); });
+    if (!all) return "";
+    return '<div class="tipbox info-box" data-h="' + esc(h.id) + '"><h4><span aria-hidden="true">✦</span> Location\'s information</h4>' +
+      '<p>' + (have ? have + ' of ' + all + ' stops have it. Tap <b>Location\'s information</b> on a stop to read it.' : 'None of the ' + all + ' stops have it yet. Claude can write it, like the Japan plan: what each place is, the best time to go, and tips for next time.') + '</p>' +
+      '<details><summary>' + (have ? "Update it with Claude" : "Add it with Claude") + '</summary><ol class="info-steps">' +
+      '<li><button class="btn small info-copy" type="button">Copy the stop list for Claude</button> Then paste it to Claude. It has the stop names, dates and rough spots, and no photos.</li>' +
+      '<li><label for="info-in">Paste Claude\'s reply here</label><textarea id="info-in" rows="5" spellcheck="false" placeholder="{&quot;places&quot;: …}"></textarea><button class="btn small info-check" type="button">Add it to the page</button></li>' +
+      '<li><button class="btn small info-save" type="button" disabled>Save the information file</button> <button class="btn small info-list" type="button" disabled>Download the new list.js</button> Put both in the website\'s <code>holidays</code> folder.</li></ol>' +
+      '<p class="tag info-msg" role="status" aria-live="polite"></p></details></div>';
+  }
+  function infoClick(b) {
+    var box = b.closest(".info-box"), h = holidays.filter(function (x) { return x.id === box.dataset.h; })[0], msg = box.querySelector(".info-msg");
+    if (!h) return;
+    if (b.classList.contains("info-copy")) {
+      var text = placeList(h), ta = box.querySelector("#info-in");
+      var fail = function () { ta.value = text; ta.select(); msg.textContent = "Press Ctrl+C (or Cmd+C) to copy the selected text, then clear the box before pasting Claude's reply."; };
+      try { navigator.clipboard.writeText(text).then(function () { msg.textContent = "Copied. Paste it to Claude, then paste the reply in the box below."; }, fail); } catch (e) { fail(); }
+      return;
+    }
+    if (b.classList.contains("info-check")) {
+      var raw = box.querySelector("#info-in").value, s = raw.indexOf("{"), e2 = raw.lastIndexOf("}"), pack;
+      try { pack = JSON.parse(raw.slice(s, e2 + 1)); } catch (err) { msg.textContent = "That doesn't look like Claude's reply. Paste the whole reply, starting with {."; return; }
+      if (!pack || typeof pack.places !== "object") { msg.textContent = "The reply has no places in it. Ask Claude again with the stop list."; return; }
+      var clean = { infoFor: h.id, made: today(), places: {}, days: {} };
+      Object.keys(pack.places).forEach(function (k) { var c = cleanInfo(pack.places[k]); if (c && /^\d+\.\d+$/.test(k)) { if (TYPE_LABEL[pack.places[k].type]) c.type = pack.places[k].type; clean.places[k] = c; } });
+      Object.keys(pack.days || {}).forEach(function (k) { if (/^\d+$/.test(k) && pack.days[k] && pack.days[k].title) clean.days[k] = { title: String(pack.days[k].title).slice(0, 120) }; });
+      var n = applyInfo(h, JSON.parse(JSON.stringify(clean)));
+      infoDraft = clean;
+      keepPlace(render);
+      var nb = document.querySelector(".info-box");
+      if (nb) {
+        nb.querySelector("details").open = true;
+        nb.querySelector(".info-save").disabled = nb.querySelector(".info-list").disabled = false;
+        nb.querySelector(".info-msg").textContent = "Added to " + n + " stops on this page. Now save the information file, so it stays.";
+      }
+      return;
+    }
+    if (b.classList.contains("info-save")) {
+      if (!infoDraft || infoDraft.infoFor !== h.id) return;
+      lockHoliday(infoDraft, unlockedKey).then(function (lockedBox) {
+        giveFile(h.id + ".info.js", "/* " + h.title + ", location's information, made " + today() + ". Locked with the album passkey. Save as holidays/" + h.id + ".info.js */\nHolidayAlbum.addLocked(" + JSON.stringify(lockedBox) + ");\n");
+        msg.textContent = "Saved " + h.id + ".info.js. Put it in the holidays folder" + ((window.HOLIDAY_FILES || []).indexOf(h.id + ".info.js") < 0 ? ", and replace list.js with the new one." : ", replacing the old one.");
+      }, function () { msg.textContent = "This browser could not lock the file. Open the album from the website (https) and try again."; });
+      return;
+    }
+    if (b.classList.contains("info-list")) {
+      var list = (window.HOLIDAY_FILES || []).slice(), name = h.id + ".info.js";
+      if (list.indexOf(name) < 0) {
+        var at = list.indexOf(h.id + ".js");
+        while (at >= 0 && at + 1 < list.length && list[at + 1].indexOf(h.id + ".photos-") === 0) at++;
+        list.splice(at < 0 ? list.length : at + 1, 0, name);
+      }
+      giveFile("list.js", "/*\n  The list of holiday files the album shows, newest first.\n  To add a holiday: put its file in this folder and add its name here.\n*/\nwindow.HOLIDAY_FILES = [\n" + list.map(function (n) { return '  "' + n + '"'; }).join(",\n") + "\n];\n");
+    }
+  }
+  // "Our photos here" opens the photo viewer at the first photo we took at that stop.
+  function openStopPhotos(b) {
+    var h = holidays.filter(function (x) { return x.id === b.dataset.h; })[0], v = h && visitsFor(h)[b.dataset.k];
+    var m = v && v.mems.filter(function (x) { return x.kind !== "video"; })[0];
+    if (m) openPhotoMem(m, b);
+  }
 
   // ---------- start ----------
   // Photo part files (holiday.photos-2.js and on) join their holiday; a repeated photo is kept once.
@@ -1890,7 +2071,7 @@
         if (now === "rebuild" ? !rb.photos.length : now.replace(/-day\d+$/, "") === hid) keepPlace(render);
       });
     });
-    mergeParts();
+    mergeParts(); mergeInfo();
     var root = document.getElementById("app");
     var h = holidays.filter(function (x) { return x.id === id; })[0];
     moreList = [];
@@ -1915,6 +2096,7 @@
   window.HolidayAlbum = {
     add: function (h) {
       if (h.partOf) { photoParts.push(h); return; }
+      if (h.infoFor) { infoPacks.push(h); return; }
       h.cover = h.cover || {}; h.memories = h.memories || []; holidays.push(h);
     },
     addLocked: function (box) { locked.push(box); },
