@@ -1094,6 +1094,10 @@
     out.querySelector("#rb-save").addEventListener("click", function () {
       flushLink();
       var msg = document.getElementById("rb-copy-msg");
+      if (rb.mode === "add" && rb.target && (laterFor(rb.target).length || partsBusy[rb.target])) {
+        msg.textContent = "Still loading this trip's photos. Wait a moment and press Save again, so none of them are lost.";
+        loadParts(rb.target); return;
+      }
       buildFiles(msg).then(function (files) {
         files.forEach(function (f, i) {
           setTimeout(function () {
@@ -1372,15 +1376,58 @@
       h.memories.sort(function (a, b) { return (a.date + (a.time || "")) < (b.date + (b.time || "")) ? -1 : 1; });
     });
   }
+  // Photo files that wait until their holiday is opened (see boot.js), loaded one at a time.
+  var partsBusy = {};
+  function laterFor(id) { return (window.HOLIDAY_LATER || []).filter(function (n) { return n.replace(/\.photos-\d+\.js$/, "") === id; }); }
+  function loadScript(name) {
+    return new Promise(function (resolve) {
+      var s = document.createElement("script"); s.src = "holidays/" + name;
+      s.onload = s.onerror = function () { s.remove(); resolve(); };
+      document.body.appendChild(s);
+    });
+  }
+  function loadParts(id, onStep) {
+    if (partsBusy[id]) return partsBusy[id];
+    var names = laterFor(id), n = 0;
+    window.HOLIDAY_LATER = (window.HOLIDAY_LATER || []).filter(function (x) { return names.indexOf(x) < 0; });
+    partsBusy[id] = names.reduce(function (chain, name) {
+      return chain.then(function () { return loadScript(name); }).then(function () {
+        var boxes = locked.splice(0);
+        return Promise.all(boxes.map(function (box) { return openBox(box, unlockedKey).then(HolidayAlbum.add, function () { }); }));
+      }).then(function () { n++; if (onStep) onStep(n, names.length); });
+    }, Promise.resolve()).then(function () { delete partsBusy[id]; partsDone[id] = true; });
+    return partsBusy[id];
+  }
+  var partsDone = {};
+  function partsNotice(id) {
+    var left = laterFor(id).length;
+    return left || partsBusy[id] ? '<div class="notice busy" id="parts-note" role="status" aria-live="polite">Loading the rest of the photos…</div>' : "";
+  }
+  function keepPlace(fn) { var y = window.scrollY; fn(); window.scrollTo(0, y); }
   function render() {
     closeYt(false);
     var id = (location.hash || "#home").slice(1);
+    var waitFor = id === "rebuild" ? holidays.map(function (x) { return x.id; }) : [id.replace(/-day\d+$/, "")];
+    waitFor.forEach(function (hid) {
+      if (!laterFor(hid).length) return;
+      loadParts(hid, function (n, total) {
+        var note = document.getElementById("parts-note");
+        if (note) note.textContent = "Loading the rest of the photos (" + n + " of " + total + ")…";
+      }).then(function () {
+        var now = (location.hash || "#home").slice(1);
+        if (now === "rebuild" ? !rb.photos.length : now.replace(/-day\d+$/, "") === hid) keepPlace(render);
+      });
+    });
     mergeParts();
     var root = document.getElementById("app");
     var h = holidays.filter(function (x) { return x.id === id; })[0];
     moreList = [];
     if (id === "rebuild") { root.innerHTML = rebuildView(); wireRebuild(root); }
-    else if (h) root.innerHTML = holidayView(h);
+    else if (h) {
+      root.innerHTML = holidayView(h);
+      var pn = partsNotice(h.id), cov = root.querySelector("section.cover");
+      if (pn && cov) cov.insertAdjacentHTML("afterend", pn);
+    }
     else if (id.indexOf("-day") > 0 && holidays.some(function (x) { return id.indexOf(x.id + "-day") === 0; })) return;
     else root.innerHTML = homeView();
     wireMore(root);

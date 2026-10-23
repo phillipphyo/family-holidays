@@ -611,3 +611,4 @@ figure.vid a { display: block; color: inherit; }
 @media (pointer: coarse) { .rb-x, .rb-rot { width: 36px; height: 36px; } }
 .rb-day .row { justify-content: space-between; align-items: center; gap: 10px; }
 .group .head .rb-out-stop { order: 3; }
+#parts-note { margin: 18px 0; }

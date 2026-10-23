@@ -37,7 +37,7 @@ The plain (unlocked) copies of the holiday files are kept outside this repositor
 3. The page reads the date and place saved in each photo, puts the photos into days, and suggests a place name for each group. Press **Look up place names online** for street-level names from OpenStreetMap.
 4. Fix any names, add a note, then press **Save holiday file** and follow the steps on the page. The file holds the photos too, already locked with the passkey.
 
-Thousands of photos are fine. The page reads them a few at a time and shows how far along it is, with a Stop button that keeps the photos read so far. A big holiday is saved as a few files (for example `europe-2022.js`, `europe-2022.photos-2.js`), each well under GitHub's 100 MB limit. Put all of them in `holidays/` and list all of them in `holidays/list.js`.
+Thousands of photos are fine. The page reads them a few at a time and shows how far along it is, with a Stop button that keeps the photos read so far. A big holiday is saved as a few files (for example `europe-2022.js`, `europe-2022.photos-2.js`), each well under GitHub's 100 MB limit. Put all of them in `holidays/` and list all of them in `holidays/list.js`. The album loads the extra photo files only when that holiday is opened, so the home page stays quick.
 
 At the top, say what the photos are for. **A trip already in the album** matches each photo to the stop planned for that day (for example Fushimi Inari on Day 2). **A past trip with no plan** builds the days, stops and route from where and when each photo was taken.
 
