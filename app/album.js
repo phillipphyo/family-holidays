@@ -410,32 +410,139 @@
     ytOpen = { box: box, was: was, fig: fig, btn: btn };
     f.focus();
   }
-  // A day's photos, under a small heading for each stop when they were matched to stops.
+  // A day's photos, under a small heading for each stop. Big days are drawn only when they come near
+  // the screen, each stop shows a first page of photos, and the pictures are set from script, so the
+  // page never parses megabytes of image text. Tapping a photo opens the photo viewer.
+  var memReg = [], gridReg = [], gridSeen = null;
+  function pageSize() { return window.matchMedia && matchMedia("(max-width: 600px)").matches ? 12 : 24; }
   function memoryGrid(list) {
+    var k = gridReg.push(list) - 1;
+    return '<div class="mem-lazy" data-grid="' + k + '" style="min-height:' + Math.min(2400, 120 + Math.ceil(list.length / 4) * 180) + 'px"></div>';
+  }
+  function memoryGridNow(list) {
     var fig = function (m) {
+      var mid = memReg.push(m) - 1;
       if (m.kind === "video") {
         var yid = okYt(m.yt) ? m.yt : ytId(m.link), st = Math.max(0, Math.floor(+m.ytStart || 0)) || 0;
         var label = m.caption || m.place || "video", data = ' data-yt="' + esc(yid) + '" data-start="' + st + '" data-title="' + esc(label) + '"';
         var cap = '<figcaption>' + esc(m.caption || m.place || "") + (m.duration ? ' · ' + mmss(m.duration) + ' video' : ' · video') +
           (yid ? ' · <a href="' + u(ytWatch(yid)) + '" target="_blank" rel="noopener noreferrer">Open on YouTube</a><span class="yt-note">If the video will not play, open it on YouTube.</span>'
             : m.link ? ' · <a href="' + u(m.link) + '" target="_blank" rel="noopener noreferrer">Full video</a>' : "") + '</figcaption>';
-        var still = '<img src="' + u(m.image) + '" alt="" loading="lazy"><span class="vid-badge" aria-hidden="true">▶ ' + mmss(m.duration) + '</span>';
-        if (m.clip) return '<figure class="vid"><div class="pic loaded"><video controls playsinline preload="none" poster="' + u(m.image) + '" src="' + safeMedia(m.clip) + '" aria-label="20-second clip: ' + esc(label) + '"></video></div>' +
+        var still = '<img data-mid="' + mid + '" alt="" decoding="async"><span class="vid-badge" aria-hidden="true">▶ ' + mmss(m.duration) + '</span>';
+        if (m.clip) return '<figure class="vid"><div class="pic loaded"><video controls playsinline preload="none" data-mid="' + mid + '" src="' + safeMedia(m.clip) + '" aria-label="20-second clip: ' + esc(label) + '"></video></div>' +
           (yid ? '<button type="button" class="btn small yt-full"' + data + '>Watch full video</button>' : "") + cap + '</figure>';
         if (yid) return '<figure class="vid"><button type="button" class="pic loaded vid-poster yt-play"' + data + ' aria-label="Play video: ' + esc(label) + (m.duration ? ", " + mmss(m.duration) : "") + '">' + still + '</button>' + cap + '</figure>';
         return '<figure class="vid"><div class="pic loaded vid-poster">' + still.replace('alt=""', 'alt="Video at ' + esc(m.place || "") + '"') + '</div>' + cap + '</figure>';
       }
-      return '<figure>' + pic({ image: m.image, name: m.place || m.caption || "", type: "sight" }) +
+      return '<figure><button type="button" class="pic photo-open" data-open="' + mid + '" aria-label="Open photo: ' + esc(m.caption || m.place || "photo") + '"><img data-mid="' + mid + '" alt="" decoding="async"></button>' +
         '<figcaption>' + esc(m.caption || m.place || "") + (m.place && m.caption ? " · " + esc(m.place) : "") + '</figcaption></figure>';
     };
     var order = [], by = {};
     list.forEach(function (m) { var k = m.stop || m.place || ""; if (!by[k]) { by[k] = []; order.push(k); } by[k].push(m); });
-    if (order.length < 2 && !list.some(function (m) { return m.stop; })) return '<div class="memories">' + list.map(fig).join("") + '</div>';
+    var page = pageSize();
+    var block = function (items, k) {
+      var first = items.slice(0, page), more = items.length - first.length;
+      var j = gridReg.push(items.slice(page)) - 1;
+      return '<div class="memories">' + first.map(fig).join("") + '</div>' +
+        (more > 0 ? '<button type="button" class="btn small mem-more" data-rest="' + j + '">Show all ' + items.length + ' photos' + (k ? ' from ' + esc(k) : '') + '</button>' : "");
+    };
+    if (order.length < 2 && !list.some(function (m) { return m.stop; })) return block(list, "");
     return order.map(function (k) {
-      return '<div class="mem-group"><h4><span aria-hidden="true">📷</span> ' + esc(k || "Other photos") + ' <span class="muted">' + by[k].length + '</span></h4><div class="memories">' + by[k].map(fig).join("") + '</div></div>';
+      return '<div class="mem-group"><h4><span aria-hidden="true">📷</span> ' + esc(k || "Other photos") + ' <span class="muted">' + by[k].length + '</span></h4>' + block(by[k], k) + '</div>';
     }).join("");
   }
+  function fillPics(box) {
+    box.querySelectorAll("img[data-mid]").forEach(function (img) {
+      var m = memReg[+img.getAttribute("data-mid")]; if (!m) return;
+      var src = m.thumb || m.image;
+      if (/^data:image\/(jpeg|png|webp);base64,/i.test(src || "")) img.src = src;
+      img.removeAttribute("data-mid");
+      var box2 = img.closest(".pic"); if (box2) box2.classList.add("loaded");
+    });
+    box.querySelectorAll("video[data-mid]").forEach(function (v) {
+      var m = memReg[+v.getAttribute("data-mid")]; if (m && /^data:image\//.test(m.image || "")) v.poster = m.image; v.removeAttribute("data-mid");
+    });
+  }
+  function drawGrid(el) {
+    var list = gridReg[+el.getAttribute("data-grid")]; if (!list) return;
+    el.removeAttribute("data-grid"); el.style.minHeight = ""; el.classList.add("drawn");
+    el.innerHTML = memoryGridNow(list); fillPics(el);
+  }
+  function wireGrids(root) {
+    if (gridSeen) gridSeen.disconnect();
+    var els = root.querySelectorAll(".mem-lazy[data-grid]");
+    if (!("IntersectionObserver" in window)) { els.forEach(drawGrid); return; }
+    gridSeen = new IntersectionObserver(function (list) {
+      list.forEach(function (e) { if (e.isIntersecting) { gridSeen.unobserve(e.target); drawGrid(e.target); } });
+    }, { rootMargin: "1500px 0px" });
+    els.forEach(function (el) { gridSeen.observe(el); });
+  }
+  function showMore(btn) {
+    var rest = gridReg[+btn.getAttribute("data-rest")] || [], grid = btn.previousElementSibling;
+    var next = rest.splice(0, 60), tmp = document.createElement("div");
+    tmp.innerHTML = memoryGridNow(next);
+    var add = tmp.querySelector(".memories");
+    if (add && grid) { var firstNew = add.firstElementChild; while (add.firstChild) grid.appendChild(add.firstChild); fillPics(grid); if (firstNew) { var b = firstNew.querySelector("button, video"); if (b) b.focus(); } }
+    if (!rest.length) btn.remove();
+    else btn.textContent = "Show " + Math.min(60, rest.length) + " more (" + rest.length + " left)";
+  }
 
+  // ---------- photo viewer ----------
+  // Full screen, one photo at a time: arrows or swipe for next and previous, Esc or Close to go back.
+  function viewer() {
+    var d = document.getElementById("photo-viewer");
+    if (d) return d;
+    d = document.createElement("dialog"); d.id = "photo-viewer"; d.className = "lightbox"; d.setAttribute("aria-label", "Photo viewer");
+    d.innerHTML = '<div class="lb-stage"><img class="lb-img" alt=""></div>' +
+      '<div class="lb-bar"><button type="button" class="lb-btn" data-lb="prev" aria-label="Previous photo">‹</button>' +
+      '<p class="lb-cap" role="status" aria-live="polite"></p>' +
+      '<button type="button" class="lb-btn" data-lb="zoom" aria-label="Zoom in" aria-pressed="false">⤢</button>' +
+      '<button type="button" class="lb-btn" data-lb="next" aria-label="Next photo">›</button>' +
+      '<button type="button" class="lb-btn lb-close" data-lb="close" aria-label="Close">✕</button></div>';
+    document.body.appendChild(d);
+    d.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-lb]"); if (!b) { if (e.target === d) d.close(); return; }
+      var k = b.getAttribute("data-lb");
+      if (k === "close") d.close(); else if (k === "prev") stepPhoto(-1); else if (k === "next") stepPhoto(1);
+      else if (k === "zoom") { var z = d.classList.toggle("zoomed"); b.setAttribute("aria-pressed", z ? "true" : "false"); b.setAttribute("aria-label", z ? "Zoom out" : "Zoom in"); }
+    });
+    d.addEventListener("keydown", function (e) { if (e.key === "ArrowLeft") { stepPhoto(-1); e.preventDefault(); } else if (e.key === "ArrowRight") { stepPhoto(1); e.preventDefault(); } });
+    var x0 = null, y0 = 0;
+    d.addEventListener("pointerdown", function (e) { if (d.classList.contains("zoomed")) return; x0 = e.clientX; y0 = e.clientY; });
+    d.addEventListener("pointerup", function (e) {
+      if (x0 == null) return; var dx = e.clientX - x0, dy = e.clientY - y0; x0 = null;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) stepPhoto(dx < 0 ? 1 : -1);
+    });
+    d.addEventListener("close", function () {
+      d.classList.remove("zoomed"); d.querySelector(".lb-img").removeAttribute("src");
+      document.documentElement.classList.remove("more-open");
+      if (d._opener && d._opener.isConnected) d._opener.focus();
+    });
+    return d;
+  }
+  var lbList = [], lbAt = 0;
+  function showPhoto() {
+    var d = viewer(), m = lbList[lbAt]; if (!m) return;
+    var img = d.querySelector(".lb-img"), src = m.image || m.thumb;
+    img.alt = m.caption || m.place || "Photo";
+    if (m.thumb && m.thumb !== src) img.src = m.thumb;
+    var full = new Image(); full.src = src;
+    (full.decode ? full.decode() : Promise.resolve()).then(function () { if (lbList[lbAt] === m) img.src = src; }, function () { if (lbList[lbAt] === m) img.src = src; });
+    d.querySelector(".lb-cap").textContent = (m.caption || m.place || "") + (m.time ? " · " + m.time : "") + " · Photo " + (lbAt + 1) + " of " + lbList.length;
+    d.querySelector('[data-lb="prev"]').disabled = lbAt === 0;
+    d.querySelector('[data-lb="next"]').disabled = lbAt === lbList.length - 1;
+  }
+  function stepPhoto(n) { var k = lbAt + n; if (k < 0 || k >= lbList.length) return; lbAt = k; viewer().classList.remove("zoomed"); showPhoto(); }
+  function openPhoto(mid, opener) {
+    var m = memReg[mid]; if (!m) return;
+    var h = holidays.filter(function (x) { return x.memories && x.memories.indexOf(m) >= 0; })[0];
+    lbList = (h ? h.memories : memReg).filter(function (x) { return x.kind !== "video"; });
+    lbAt = Math.max(0, lbList.indexOf(m));
+    var d = viewer(); d._opener = opener;
+    showPhoto();
+    if (!d.open) { d.showModal(); document.documentElement.classList.add("more-open"); }
+    d.querySelector('[data-lb="close"]').focus();
+  }
 
   // ---------- rebuild from photos ----------
   var rb = { photos: [], mode: "", target: "" };
@@ -766,6 +873,12 @@
       }
     }
     ph.forEach(function (p) { if (!p.tidy && p.sharp < blurLine) p.tidy = "blur"; });
+    var T = rb.mode === "add" && rbTarget();
+    if (T) {
+      var have = {};
+      (T.memories || []).forEach(function (m) { have[m.date + "|" + (m.time || "") + "|" + (m.file || "")] = true; });
+      rb.photos.forEach(function (p) { if (have[p.date + "|" + (p.time || "") + "|" + p.name]) p.tidy = "already"; });
+    }
   }
   // Turn a picture a quarter turn to the right (for photos whose camera didn't save which way up it was held).
   function turnPic(src) {
@@ -791,9 +904,9 @@
   function kept(p) { return !p.out && (rb.noTidy || !p.tidy || p.keep); }
   function tidyPanel() {
     if (rb.noTidy && !rb.photos.some(function (p) { return p.tidy; })) return "";
-    var by = { blur: [], repeat: [], similar: [] };
+    var by = { blur: [], repeat: [], similar: [], already: [] };
     rb.photos.forEach(function (p) { if (p.tidy) by[p.tidy].push(p); });
-    var n = by.blur.length + by.repeat.length + by.similar.length;
+    var n = by.blur.length + by.repeat.length + by.similar.length + by.already.length;
     if (!n) return '<div class="rb-tidy"><p class="tag">Tidy-up: no blurry photos, repeats or near-same shots found.</p></div>';
     var left = rb.photos.filter(function (p) { return p.tidy && !p.keep; }).length;
     var sect = function (key, title, text) {
@@ -808,9 +921,10 @@
     };
     return '<div class="rb-tidy"><h3>Tidy-up</h3><p>' + (rb.noTidy ? "Tidy-up is off, so every photo goes in the album. " :
       'We set aside ' + left + (left < n ? ' of ' + n : '') + ' photos so the album only has the good ones: ' +
-      [by.blur.length ? by.blur.length + " blurry" : "", by.repeat.length ? by.repeat.length + " repeats" : "", by.similar.length ? by.similar.length + " nearly the same as another shot (we kept the sharpest)" : ""].filter(Boolean).join(", ") +
+      [by.already.length ? by.already.length + " already in the album" : "", by.blur.length ? by.blur.length + " blurry" : "", by.repeat.length ? by.repeat.length + " repeats" : "", by.similar.length ? by.similar.length + " nearly the same as another shot (we kept the sharpest)" : ""].filter(Boolean).join(", ") +
       '. Nothing is deleted from your device. Tick Keep on any you want back.') + '</p>' +
       '<details><summary>Look at the photos set aside</summary>' +
+      sect("already", "Already in the album", "Same date, time and file name as a photo already in this trip, so it would show twice.") +
       sect("blur", "Blurry", "Out of focus or shaky, or a blurrier copy of a shot we kept. Very plain photos (sky, a wall) can show up here too.") +
       sect("repeat", "Repeats", "The same photo added twice, or a copy of one already in the list.") +
       sect("similar", "Nearly the same", "Taken within two minutes and looking almost the same as a sharper shot we kept.") +
@@ -1094,6 +1208,10 @@
     out.querySelector("#rb-save").addEventListener("click", function () {
       flushLink();
       var msg = document.getElementById("rb-copy-msg");
+      if (rb.mode === "add" && rb.target && (partsFailed[rb.target] || []).length) {
+        msg.textContent = "A photos file didn't load (" + partsFailed[rb.target].join(", ") + "). Saving now would leave out the photos in that file, so we stopped. Reload the page and try again.";
+        return;
+      }
       if (rb.mode === "add" && rb.target && (laterFor(rb.target).length || partsBusy[rb.target])) {
         msg.textContent = "Still loading this trip's photos. Wait a moment and press Save again, so none of them are lost.";
         loadParts(rb.target); return;
@@ -1166,6 +1284,7 @@
       g.photos.forEach(function (p) {
         if (!p.data) return;
         var m = { date: p.date, file: p.name, image: p.data, place: g.anchor || rb.names[g.key] || "" };
+        if (p.thumb && p.thumb !== p.data) m.thumb = p.thumb;
         if (g.anchor) m.stop = g.anchor;
         if (p.video) {
           m.kind = "video"; if (p.duration) m.duration = Math.round(p.duration);
@@ -1185,9 +1304,7 @@
     if (target) {
       // The whole trip again, with the new photos added (the same file names replace the old ones).
       hol = Object.assign({}, target, { memories: target.memories.slice() });
-      var have = {};
-      hol.memories.forEach(function (m) { have[m.date + "|" + (m.file || m.image)] = true; });
-      memories.forEach(function (m) { if (!have[m.date + "|" + m.file]) hol.memories.push(m); });
+      memories.forEach(function (m) { hol.memories.push(m); });
       hol.memories.sort(function (a, b) { return (a.date + (a.time || "")) < (b.date + (b.time || "")) ? -1 : 1; });
     } else {
       // A past trip: days, stops, cities and the route all come from the photos.
@@ -1225,7 +1342,7 @@
     // Big holidays are split into parts of about 30 MB of photos (about 40 MB once locked), well under GitHub's 100 MB limit.
     var parts = [[]], size = 0, LIMIT = 30 * 1048576;
     hol.memories.forEach(function (m) {
-      var n = (m.image || "").length + (m.clip || "").length;
+      var n = (m.image || "").length + (m.clip || "").length + (m.thumb || "").length;
       if (size + n > LIMIT && parts[parts.length - 1].length) { parts.push([]); size = 0; }
       parts[parts.length - 1].push(m); size += n;
     });
@@ -1277,7 +1394,7 @@
   // opens the files on GitHub sees only scrambled text. The passkey itself is
   // never saved in the website; the right passkey is the only thing that can
   // turn the files back into trips.
-  var locked = [], unlockedKey = "";
+  var locked = [], unlockedKey = "", badFiles = 0;
   function b64(buf) { var s = "", a = new Uint8Array(buf); for (var i = 0; i < a.length; i += 0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000)); return btoa(s); }
   function unb64(s) { var bin = atob(s), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
   function deriveKey(pass, salt, iter) {
@@ -1298,8 +1415,12 @@
     }).then(function (plain) { return JSON.parse(new TextDecoder().decode(plain)); });
   }
   function tryUnlock(pass) {
-    return Promise.all(locked.map(function (box) { return openBox(box, pass); })).then(function (list) {
-      list.forEach(function (h) { HolidayAlbum.add(h); });
+    var boxes = locked.slice();
+    return Promise.all(boxes.map(function (box) { return openBox(box, pass).then(function (h) { return { h: h }; }, function () { return null; }); })).then(function (list) {
+      var ok = list.filter(Boolean);
+      if (!ok.length) throw new Error("wrong passkey");
+      ok.forEach(function (r) { HolidayAlbum.add(r.h); });
+      badFiles = list.length - ok.length;
       locked = [];
       unlockedKey = pass;
     });
@@ -1357,6 +1478,12 @@
       document.getElementById("app").addEventListener("click", function (e) {
         var b = e.target.closest && e.target.closest(".yt-play, .yt-full");
         if (b) openYt(b);
+        var o = e.target.closest && e.target.closest(".photo-open");
+        if (o) openPhoto(+o.getAttribute("data-open"), o);
+        var rt = e.target.closest && e.target.closest("[data-retry]");
+        if (rt) retryParts(rt.getAttribute("data-retry"));
+        var mm = e.target.closest && e.target.closest(".mem-more");
+        if (mm) showMore(mm);
       });
     }
     render();
@@ -1370,9 +1497,8 @@
     photoParts.splice(0).forEach(function (part) {
       var h = holidays.filter(function (x) { return x.id === part.partOf; })[0];
       if (!h) return;
-      var have = {};
-      h.memories.forEach(function (m) { have[m.date + "|" + (m.file || m.image)] = true; });
-      (part.memories || []).forEach(function (m) { if (!have[m.date + "|" + (m.file || m.image)]) h.memories.push(m); });
+      // Every photo in a part is kept, even when two photos share a file name (two phones can both make IMG_1234).
+      (part.memories || []).forEach(function (m) { h.memories.push(m); });
       h.memories.sort(function (a, b) { return (a.date + (a.time || "")) < (b.date + (b.time || "")) ? -1 : 1; });
     });
   }
@@ -1382,7 +1508,8 @@
   function loadScript(name) {
     return new Promise(function (resolve) {
       var s = document.createElement("script"); s.src = "holidays/" + name;
-      s.onload = s.onerror = function () { s.remove(); resolve(); };
+      s.onload = function () { s.remove(); resolve(true); };
+      s.onerror = function () { s.remove(); resolve(false); };
       document.body.appendChild(s);
     });
   }
@@ -1391,21 +1518,30 @@
     var names = laterFor(id), n = 0;
     window.HOLIDAY_LATER = (window.HOLIDAY_LATER || []).filter(function (x) { return names.indexOf(x) < 0; });
     partsBusy[id] = names.reduce(function (chain, name) {
-      return chain.then(function () { return loadScript(name); }).then(function () {
+      return chain.then(function () { return loadScript(name); }).then(function (ok) {
+        if (!ok) { (partsFailed[id] = partsFailed[id] || []).push(name); return; }
         var boxes = locked.splice(0);
         return Promise.all(boxes.map(function (box) { return openBox(box, unlockedKey).then(HolidayAlbum.add, function () { }); }));
       }).then(function () { n++; if (onStep) onStep(n, names.length); });
     }, Promise.resolve()).then(function () { delete partsBusy[id]; partsDone[id] = true; });
     return partsBusy[id];
   }
-  var partsDone = {};
+  var partsDone = {}, partsFailed = {};
+  function retryParts(id) {
+    var names = partsFailed[id] || []; delete partsFailed[id];
+    window.HOLIDAY_LATER = (window.HOLIDAY_LATER || []).concat(names);
+    keepPlace(render);
+  }
   function partsNotice(id) {
     var left = laterFor(id).length;
+    if ((partsFailed[id] || []).length && !left && !partsBusy[id])
+      return '<div class="notice" id="parts-note" role="alert">Some photos couldn\'t load (' + esc(partsFailed[id].join(", ")) + '). Check your internet and <button class="btn small" type="button" data-retry="' + esc(id) + '">Try again</button></div>';
     return left || partsBusy[id] ? '<div class="notice busy" id="parts-note" role="status" aria-live="polite">Loading the rest of the photos…</div>' : "";
   }
   function keepPlace(fn) { var y = window.scrollY; fn(); window.scrollTo(0, y); }
   function render() {
     closeYt(false);
+    memReg = []; gridReg = [];
     var id = (location.hash || "#home").slice(1);
     var waitFor = id === "rebuild" ? holidays.map(function (x) { return x.id; }) : [id.replace(/-day\d+$/, "")];
     waitFor.forEach(function (hid) {
@@ -1430,7 +1566,9 @@
     }
     else if (id.indexOf("-day") > 0 && holidays.some(function (x) { return id.indexOf(x.id + "-day") === 0; })) return;
     else root.innerHTML = homeView();
+    if (badFiles && id === "home") { var mainEl = root.querySelector("main"); if (mainEl) mainEl.insertAdjacentHTML("afterbegin", '<div class="notice" role="alert" style="margin-top:18px">' + (badFiles === 1 ? "One holiday file" : badFiles + " holiday files") + ' couldn\'t be opened, so that trip is missing. The file may be damaged or only half uploaded.</div>'); }
     wireMore(root);
+    wireGrids(root);
     var lockBtn = root.querySelector('[data-action="lock"]');
     if (lockBtn) lockBtn.addEventListener("click", function () { HolidayAlbum.lock(); });
     wirePics(root);
