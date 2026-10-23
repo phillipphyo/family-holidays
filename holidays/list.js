@@ -12,5 +12,6 @@ window.HOLIDAY_FILES = [
   "europe-2022.photos-6.js",
   "europe-2022.photos-7.js",
   "europe-2022.photos-8.js",
-  "europe-2022.photos-9.js"
+  "europe-2022.photos-9.js",
+  "europe-2022.info.js"
 ];
