@@ -30,12 +30,15 @@ Ask Claude: "add our Bali trip to the holiday album" and paste the plan. Claude 
 
 The plain (unlocked) copies of the holiday files are kept outside this repository, in the project folder `holiday-album/source/`, so they never become public.
 
-## Rebuilding a past holiday from photos
+## Adding your photos (five steps)
 
-1. Open the website and press **Rebuild from photos**.
-2. Choose the photos (or drop them into the box). They stay on your computer. Nothing is uploaded.
-3. The page reads the date and place saved in each photo, puts the photos into days, and suggests a place name for each group. Press **Look up place names online** for street-level names from OpenStreetMap.
-4. Fix any names, add a note, then press **Save holiday file** and follow the steps on the page. The file holds the photos too, already locked with the passkey.
+Open the website and press **Add your photos**. The page walks through five steps, with Back and Next at the bottom. Nothing is lost when you go back.
+
+1. **Choose photos.** Say what they are for, then choose the photos (or drop them in the box). They stay on your computer until you save. For a past trip, the name is filled in from the main city and year, and you can change it.
+2. **Check days and places.** Each day is one line, for example "Day 3 · Sat 12 Jul · Paris · 5 stops · 148 photos". Open a day to name its stops. Tap a name idea, press **Needs a name** to see only the stops with no name, or **Look up place names online** (it sends only the rough spot, to about 100 metres, to OpenStreetMap). × leaves a photo out and ↻ turns it. Undo appears for a few seconds after each change.
+3. **Tidy up.** Each photo set aside is shown next to the one we kept, with the reason. Tick "Keep this one too", or "Keep all of these".
+4. **Videos** (only when there are videos). Keep a 20-second clip, or paste YouTube links.
+5. **Save.** Check the summary and the cover, then press **Save my holiday**. The files are listed in upload order: photo files first, the main file last. Under **More options** there is a new `list.js` that keeps the other trips in order. Every save also stays in GitHub's history, so save a big trip once rather than many times.
 
 Thousands of photos are fine. The page reads them a few at a time and shows how far along it is, with a Stop button that keeps the photos read so far. A big holiday is saved as a few files (for example `europe-2022.js`, `europe-2022.photos-2.js`), each well under GitHub's 100 MB limit. Put all of them in `holidays/` and list all of them in `holidays/list.js`. The album loads the extra photo files only when that holiday is opened, so the home page stays quick.
 

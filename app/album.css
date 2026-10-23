@@ -634,3 +634,73 @@ dialog.lightbox.zoomed .lb-img { max-width: none; max-height: none; width: 200%;
 .lb-btn:disabled { opacity: .3; cursor: default; }
 .lb-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .lb-bar .lb-btn[data-lb="prev"] { order: -1; }
+
+/* ---------- Add your photos: five steps ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.rb-intro { padding-bottom: 4px; }
+.rb-progress ol { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.rb-progress button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 14px 6px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 14px/1.2 var(--body); cursor: pointer; }
+.rb-progress button:disabled { opacity: .5; cursor: not-allowed; }
+.rb-progress .rb-num { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); font: 600 13px/1 var(--mono); }
+.rb-progress .done .rb-num { background: var(--t-hotel); color: var(--surface); box-shadow: none; }
+.rb-progress [aria-current="step"] { border-color: var(--indigo); box-shadow: 0 0 0 1px var(--indigo); }
+.rb-progress [aria-current="step"] .rb-num { background: var(--indigo); color: var(--on-indigo); box-shadow: none; }
+@media (max-width: 600px) { .rb-progress li:not(.now) .rb-step-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .rb-progress button { padding-right: 8px; } .rb-progress .now button { padding-right: 14px; } }
+.rb-step-h { margin-top: 22px; font-size: clamp(22px, 3vw, 28px); }
+.rb-step-h:focus { outline: none; }
+.rb-step-h:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+.rb-why { margin: 6px 0 4px; color: var(--muted); max-width: 70ch; }
+.rb-why b { color: var(--ink); }
+.rb-foot { position: sticky; bottom: 0; z-index: 4; margin: 28px calc(-1 * min(16px, 4vw)) 0; padding: 10px min(16px, 4vw) calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: var(--paper); border-top: 1px solid var(--line); }
+.rb-foot-btns { display: flex; gap: 8px; margin-left: auto; }
+.rb-foot .btn { min-height: 44px; }
+.rb-toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20; display: flex; align-items: center; gap: 12px; max-width: min(560px, calc(100vw - 32px)); padding: 10px 12px 10px 16px; border-radius: 12px; background: var(--ink); color: var(--paper); box-shadow: 0 8px 28px rgba(0,0,0,.25); font-size: 14px; }
+.rb-toast[hidden] { display: none; }
+.rb-toast .btn { background: transparent; color: inherit; border-color: currentColor; }
+details.rb-day { margin-top: 10px; display: block; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); }
+details.rb-day > summary { cursor: pointer; padding: 14px 16px; min-height: 44px; font-size: 15px; line-height: 1.4; list-style-position: inside; }
+details.rb-day[open] > summary { border-bottom: 1px solid var(--line); }
+.rb-day-body { padding: 4px 14px 16px; display: grid; gap: 6px; }
+.rb-day-body:empty { display: none; }
+.rb-day-body .group { box-shadow: none; border: 1px solid var(--line); }
+.rb-tools { margin-top: 14px; gap: 10px; }
+.group.needs .rb-name { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+.rb-ideas { display: flex; flex-wrap: wrap; gap: 6px; }
+.rb-note-box summary { cursor: pointer; color: var(--indigo); font-size: 14px; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.rb-note-box input { width: 100%; margin-top: 6px; }
+.rb-showall { justify-self: start; }
+.rb-x::before, .rb-rot::before { content: ""; position: absolute; inset: -8px; }
+.rb-x:focus-visible, .rb-rot:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.rb-total { font-size: 17px; margin: 14px 0 6px; }
+.rb-tidy-sec { border-top: 1px solid var(--line); padding-top: 10px; }
+.rb-tidy-sec > summary { cursor: pointer; min-height: 36px; display: flex; gap: 8px; align-items: center; }
+.rb-pairs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 12px; margin: 10px 0; }
+.rb-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); align-content: start; }
+.rb-pair figure { margin: 0; display: grid; gap: 4px; }
+.rb-pair figure:only-of-type { grid-column: 1 / -1; max-width: 50%; }
+.rb-pair img, .rb-pair .ph { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: grid; place-items: center; background: var(--line); }
+.rb-pair figure:last-of-type img { opacity: .6; }
+.rb-pair.kept figure:last-of-type img { opacity: 1; box-shadow: 0 0 0 2px var(--indigo); }
+.rb-pair figcaption { font: 600 12px/1.2 var(--body); color: var(--muted); }
+.rb-pair .tag, .rb-pair .check { grid-column: 1 / -1; }
+.rb-covers { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin: 10px 0 20px; }
+.rb-cover { padding: 0; border: 0; border-radius: 10px; overflow: hidden; aspect-ratio: 1; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; display: grid; place-items: center; font: 600 13px/1.3 var(--body); color: var(--ink); }
+.rb-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rb-cover[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--indigo); }
+.rb-cover.auto span { padding: 8px; text-align: center; }
+.rb-sum { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; margin: 16px 0 22px; display: grid; gap: 8px; }
+.rb-meter { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.rb-meter span { display: block; height: 100%; background: var(--indigo); }
+.rb-save-box { display: grid; gap: 10px; margin: 8px 0 24px; }
+.rb-save-box .btn.primary { min-height: 48px; font-size: 16px; padding-left: 22px; padding-right: 22px; }
+.rb-filelist { list-style: none; padding: 0; margin: 8px 0 20px; display: grid; gap: 6px; }
+.rb-filelist li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.rb-filelist code { overflow-wrap: anywhere; }
+.rb-filelist .btn { margin-left: auto; }
+.rb-tick { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--line); display: inline-grid; place-items: center; font-size: 13px; }
+.rb-filelist li.saved .rb-tick { background: var(--t-hotel); box-shadow: none; color: var(--surface); }
+.rb-filelist li.saved .rb-tick::after { content: "✓"; }
+.rb-more-opts { margin: 10px 0 22px; }
+.rb-more-opts summary { cursor: pointer; color: var(--indigo); font-weight: 600; min-height: 36px; display: flex; align-items: center; }
+.rb-more-opts > div { display: grid; gap: 10px; margin-top: 8px; }
+.rb-check-list { display: grid; gap: 6px; margin: 8px 0 0 20px; }

@@ -257,7 +257,7 @@
       '<a class="brand" href="#home"><span class="seal" aria-hidden="true">旅</span>Our Holiday Album</a>' +
       '<nav class="nav" aria-label="Pages">' +
       '<a href="#home"' + (active === "home" ? ' aria-current="page"' : "") + '>Holidays</a>' +
-      '<a href="#rebuild"' + (active === "rebuild" ? ' aria-current="page"' : "") + '>Rebuild from photos</a>' +
+      '<a href="#rebuild"' + (active === "rebuild" ? ' aria-current="page"' : "") + '>Add your photos</a>' +
       (unlockedKey ? '<button class="btn small" type="button" data-action="lock">Lock</button>' : "") +
       '</nav></div></header><main class="wrap">' + inner + '</main>' +
       '<footer class="wrap">Each photo credit links to where the picture came from. Our own photos are kept inside the locked holiday files.</footer>';
@@ -275,7 +275,7 @@
         '<h3>' + esc(h.title) + '</h3><p class="muted">' + esc(h.subtitle) + '</p>' +
         '<p class="eyebrow">' + esc(niceShort(h.start)) + ' to ' + esc(nice(h.end)) + ' · ' + (daysBetween(h.start, h.end) + 1) + ' days</p></div></a>';
     }).join("");
-    cards += '<a class="trip-card add" href="#rebuild"><span class="eyebrow">Past holidays</span><h3>Rebuild a holiday from your photos</h3>' +
+    cards += '<a class="trip-card add" href="#rebuild"><span class="eyebrow">Past holidays</span><h3>Add your photos</h3>' +
       '<p class="muted">Choose old photos. The album reads when and where each was taken, sorts them into days and suggests the place names.</p></a>';
     return frame("home",
       '<div class="intro"><span class="eyebrow">Family album</span><h1>Every trip, day by day</h1>' +
@@ -369,7 +369,7 @@
 
     if (!(h.memories || []).length) {
       html += '<section><div class="section-head"><h2>Our photos</h2></div><div class="empty"><b>No photos yet.</b>' +
-        '<p>After the trip, open <a href="#rebuild">Rebuild from photos</a>, choose "Add to: ' + esc(h.title) + '" and pick your photos. Each photo goes under the day it was taken, next to the nearest stop.</p></div></section>';
+        '<p>After the trip, open <a href="#rebuild">Add your photos</a>, choose "Add to: ' + esc(h.title) + '" and pick your photos. Each photo goes under the day it was taken, next to the nearest stop.</p></div></section>';
     }
     return frame(h.id, html);
   }
@@ -570,58 +570,120 @@
   }
 
   function rbTarget() { return rb.mode === "add" ? holidays.filter(function (h) { return h.id === rb.target; })[0] || holidays[0] : null; }
+  // ---------- Add your photos: five steps ----------
+  // Every choice is kept in rb, so going Back and Next never loses anything.
+  function rbSteps() {
+    var add = rb.mode === "add";
+    var s = [
+      { k: "choose", t: "Choose photos", why: "The album reads the date and the place saved inside each photo, so it can sort them for you. Your photos stay on your device until you save." },
+      { k: "check", t: add ? "Check the matches" : "Check days and places", why: add ? "Each photo is matched to the stop planned for that day. Photos taken somewhere else need a name, so they show up in the right place." : "Photos taken close together on the same day become one stop. A good name makes the album easy to read later." },
+      { k: "tidy", t: "Tidy up", why: "Blurry photos, repeats and near-same shots make the album long and slow to scroll. We set them aside, and you can bring any of them back." }
+    ];
+    if (rb.photos.some(function (p) { return p.video && !p.out; })) s.push({ k: "videos", t: "Videos", why: "A short clip plays inside the album. A YouTube link lets the family watch the whole video without making the album files huge." });
+    s.push({ k: "save", t: "Save", why: "Saving locks the photos with the family passkey, so only the family can see them on the website." });
+    return s;
+  }
+  function rbStepAt() {
+    var list = rbSteps(), i = 0;
+    list.forEach(function (x, n) { if (x.k === rb.step) i = n; });
+    if (rb.step === "videos" && list[i].k !== "videos") i = list.length - 1;
+    if (!rb.photos.length) i = 0;
+    return { list: list, i: i, step: list[i] };
+  }
+  function stepNav() {
+    var at = rbStepAt(), ready = rb.photos.length && !rb.busy;
+    return '<nav class="rb-progress" id="rb-progress" aria-label="Steps"><ol>' + at.list.map(function (s, n) {
+      return '<li class="' + (n < at.i ? "done" : n === at.i ? "now" : "") + '"><button type="button" data-go="' + s.k + '"' + (n === at.i ? ' aria-current="step"' : "") + (!ready && n ? " disabled" : "") + '>' +
+        '<span class="rb-num" aria-hidden="true">' + (n < at.i ? "✓" : n + 1) + '</span><span class="rb-step-t">' + esc(s.t) + '</span></button></li>';
+    }).join("") + '</ol></nav>';
+  }
+  function stepFoot() {
+    var at = rbStepAt(), ready = rb.photos.length && !rb.busy, next = at.list[at.i + 1];
+    return '<div class="rb-foot" id="rb-foot"><span class="tag">Step ' + (at.i + 1) + ' of ' + at.list.length + '</span><span class="rb-foot-btns">' +
+      (at.i ? '<button class="btn" type="button" data-go="' + at.list[at.i - 1].k + '">Back</button>' : "") +
+      (next ? '<button class="btn primary" type="button" id="rb-next" data-go="' + next.k + '"' + (ready ? "" : " disabled") + '>Next: ' + esc(next.t) + '</button>' : "") + '</span></div>';
+  }
+  function updateChrome() {
+    var a = document.getElementById("rb-progress"), b = document.getElementById("rb-foot");
+    if (a) a.outerHTML = stepNav();
+    if (b) b.outerHTML = stepFoot();
+  }
+  function goStep(k) {
+    flushLink();
+    rb.step = k; rb.needs = false;
+    render();
+    var h = document.getElementById("rb-step-h"); if (h) h.focus({ preventScroll: true });
+  }
+  // One quiet message for screen readers, plus a short note on screen with Undo when it helps.
+  function say(text, undo) {
+    var live = document.getElementById("rb-live"); if (live) live.textContent = text;
+    var t = document.getElementById("rb-toast");
+    if (!t) return;
+    clearTimeout(rb.toastTimer);
+    if (!undo) { t.hidden = true; rb.undo = null; return; }
+    rb.undo = undo;
+    t.innerHTML = '<span>' + esc(text) + '</span><button class="btn small" type="button" id="rb-undo">Undo</button>';
+    t.hidden = false;
+    rb.toastTimer = setTimeout(function () { t.hidden = true; rb.undo = null; }, 9000);
+  }
+
   function rebuildView() {
     if (!rb.mode) rb.mode = "past";
     if (rb.mode === "add" && !holidays.length) rb.mode = "past";
-    var add = rb.mode === "add", t = rbTarget();
-    var opts = holidays.map(function (h) {
-      return '<option value="' + esc(h.id) + '"' + (t && t.id === h.id ? " selected" : "") + '>' + esc(h.title) + ' (' + esc(niceShort(h.start)) + ' to ' + esc(nice(h.end)) + ')</option>';
-    }).join("");
-    var choice = function (mode, title, text) {
-      return '<button type="button" class="rb-mode" role="radio" aria-checked="' + (rb.mode === mode) + '" data-mode="' + mode + '"' + (mode === "add" && !holidays.length ? " disabled" : "") + '>' +
-        '<span class="rb-dot" aria-hidden="true"></span><b>' + title + '</b><span class="muted">' + text + '</span></button>';
-    };
-    var html = '<div class="intro"><span class="eyebrow">Photos and memories</span><h1>Add your photos to the album</h1>' +
-      '<p>The album reads the date and the place saved inside each photo by your phone or camera, then puts every photo in the right day and place. Your photos stay on your device until you save.</p></div>' +
-      '<h2 class="rb-q" id="rb-q">What are these photos for?</h2>' +
-      '<div class="rb-modes" role="radiogroup" aria-labelledby="rb-q">' +
-      choice("add", "A trip already in the album", "For example, our Japan trip once we're back. Each photo is matched to the stop planned for that day, such as Fushimi Inari on Day 2.") +
-      choice("past", "A past trip with no plan", "For example, Europe 2022. The album builds the days, the stops and the route from where and when each photo was taken.") + '</div>' +
-      '<div class="form">' + (add
-        ? '<label for="rb-target">Which trip?<select id="rb-target">' + opts + '</select></label>'
-        : '<label for="rb-title">Holiday name<input id="rb-title" type="text" placeholder="For example: Europe 2022" value="' + esc(rb.title || "") + '"></label>' +
-          '<label for="rb-sub">Cities or one line about it<input id="rb-sub" type="text" placeholder="Left empty, the cities are filled in from the photos" value="' + esc(rb.sub || "") + '"></label>') + '</div>' +
-      '<div class="steps">' + (add
-        ? '<div><b>Choose photos</b><p class="muted">Pick every photo from the trip. Photos from before or after the trip dates are shown apart, and you choose whether to keep them.</p></div>' +
-          '<div><b>Check the matches</b><p class="muted">Each day lists its planned stops and how many photos landed at each. Photos taken somewhere else get their own group to name.</p></div>'
-        : '<div><b>Choose photos</b><p class="muted">Pick every photo from the trip. Thousands are fine. They stay on your device.</p></div>' +
-          '<div><b>Check the stops</b><p class="muted">Photos taken close together on the same day become one stop. Each day gets its city. Rename any stop or add a note.</p></div>') +
-      '<div><b>Save</b><p class="muted">Save the locked holiday file (a big holiday saves as a few files) and put it in the website folder. The steps are shown below.</p></div></div>' +
-      '<label class="drop" id="rb-drop" for="rb-files"><b>Drop photos here, or tap to choose</b><span class="muted">Photos (JPG, PNG, iPhone HEIC) and videos (MP4, MOV). You can add more at any time.</span>' +
-      '<input id="rb-files" type="file" accept="image/*,.heic,.heif,video/*,.mov,.mp4,.m4v" multiple></label>' +
-      '<div id="rb-out"></div>';
+    if (!rb.step) rb.step = "choose";
+    var at = rbStepAt(), add = rb.mode === "add", t = rbTarget();
+    var html = '<div id="rb-wrap"><div class="intro rb-intro"><span class="eyebrow">Photos and memories</span><h1>Add your photos to the album</h1></div>' + stepNav() +
+      '<h2 class="rb-step-h" id="rb-step-h" tabindex="-1">Step ' + (at.i + 1) + ' of ' + at.list.length + ': ' + esc(at.step.t) + '</h2>' +
+      '<p class="rb-why"><b>Why:</b> ' + esc(at.step.why) + '</p>';
+    if (at.step.k === "choose") {
+      var opts = holidays.map(function (h) {
+        return '<option value="' + esc(h.id) + '"' + (t && t.id === h.id ? " selected" : "") + '>' + esc(h.title) + ' (' + esc(niceShort(h.start)) + ' to ' + esc(nice(h.end)) + ')</option>';
+      }).join("");
+      var choice = function (mode, title, text) {
+        return '<button type="button" class="rb-mode" role="radio" aria-checked="' + (rb.mode === mode) + '" data-mode="' + mode + '"' + (mode === "add" && !holidays.length ? " disabled" : "") + '>' +
+          '<span class="rb-dot" aria-hidden="true"></span><b>' + title + '</b><span class="muted">' + text + '</span></button>';
+      };
+      html += '<h3 class="rb-q" id="rb-q">What are these photos for?</h3>' +
+        '<div class="rb-modes" role="radiogroup" aria-labelledby="rb-q">' +
+        choice("add", "A trip already in the album", "For example, our Japan trip once we're back. Each photo is matched to the stop planned for that day, such as Fushimi Inari on Day 2.") +
+        choice("past", "A past trip with no plan", "For example, Europe 2022. The album builds the days, the stops and the route from where and when each photo was taken.") + '</div>' +
+        '<div class="form">' + (add
+          ? '<label for="rb-target">Which trip?<select id="rb-target">' + opts + '</select></label>'
+          : '<label for="rb-title">Holiday name<input id="rb-title" type="text" placeholder="For example: Europe 2022" value="' + esc(rb.title || "") + '"></label>' +
+            '<label for="rb-sub">Cities or one line about it<input id="rb-sub" type="text" placeholder="Left empty, the cities are filled in from the photos" value="' + esc(rb.sub || "") + '"></label>') + '</div>' +
+        '<label class="drop" id="rb-drop" for="rb-files"><b>Drop photos here, or tap to choose</b><span class="muted">Photos (JPG, PNG, iPhone HEIC) and videos (MP4, MOV). Thousands are fine. You can add more at any time.</span>' +
+        '<input id="rb-files" type="file" accept="image/*,.heic,.heif,video/*,.mov,.mp4,.m4v" multiple></label>';
+    }
+    html += '<div id="rb-out"></div><div id="rb-live" class="sr-only" aria-live="polite"></div><div class="rb-toast" id="rb-toast" role="status" hidden></div>' + stepFoot() + '</div>';
     return frame("rebuild", html);
   }
 
   function wireRebuild(root) {
-    var drop = root.querySelector("#rb-drop"), input = root.querySelector("#rb-files");
+    var wrap = root.querySelector("#rb-wrap"), drop = root.querySelector("#rb-drop"), input = root.querySelector("#rb-files");
     root.querySelectorAll(".rb-mode").forEach(function (b) {
       b.addEventListener("click", function () {
         if (rb.mode === b.dataset.mode) return;
         rb.mode = b.dataset.mode; rb.names = {}; rb.online = {};
-        render();
+        tidy(); render();
         var again = document.querySelector('.rb-mode[data-mode="' + rb.mode + '"]'); if (again) again.focus();
       });
     });
     var tsel = root.querySelector("#rb-target");
-    if (tsel) { rb.target = tsel.value; tsel.addEventListener("change", function (e) { rb.target = e.target.value; rb.names = {}; drawGroups(); }); }
+    if (tsel) { rb.target = tsel.value; tsel.addEventListener("change", function (e) { rb.target = e.target.value; rb.names = {}; tidy(); drawGroups(); }); }
     var ti = root.querySelector("#rb-title"), su = root.querySelector("#rb-sub");
-    if (ti) ti.addEventListener("input", function (e) { rb.title = e.target.value; refreshFile(); });
-    if (su) su.addEventListener("input", function (e) { rb.sub = e.target.value; refreshFile(); });
-    input.addEventListener("change", function () { addFiles(input.files); input.value = ""; });
-    ["dragenter", "dragover"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
-    ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
-    drop.addEventListener("drop", function (e) { addFiles(e.dataTransfer.files); });
+    if (ti) ti.addEventListener("input", function (e) { rb.title = e.target.value; rb.titleAuto = false; });
+    if (su) su.addEventListener("input", function (e) { rb.sub = e.target.value; });
+    if (input) input.addEventListener("change", function () { addFiles(input.files); input.value = ""; });
+    if (drop) {
+      ["dragenter", "dragover"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
+      ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
+      drop.addEventListener("drop", function (e) { addFiles(e.dataTransfer.files); });
+    }
+    wrap.addEventListener("click", rbClick);
+    wrap.addEventListener("input", rbInput);
+    wrap.addEventListener("change", rbChange);
+    wrap.addEventListener("toggle", rbToggle, true);
+    wrap.addEventListener("blur", function (e) { if (e.target.classList && e.target.classList.contains("rb-link")) flushLink(); }, true);
     drawGroups();
   }
 
@@ -634,21 +696,34 @@
     var total = list.length, done = 0, started = Date.now(), items = [], next = 0, running = 0;
     var size = photoSize(rb.photos.length + total), lanes = workerPool() ? pool.length : 3;
     rb.busy = { stop: false };
-    out.insertAdjacentHTML("afterbegin", '<div class="notice busy" id="rb-busy" role="status" aria-live="polite"><div class="row"><span id="rb-busy-text">Reading ' + total + ' photos…</span>' +
-      '<button class="btn small" type="button" id="rb-stop">Stop and keep these</button></div><div class="bar-track" aria-hidden="true"><span id="rb-busy-bar"></span></div></div>');
+    out.insertAdjacentHTML("afterbegin", '<div class="notice busy" id="rb-busy"><div class="row"><span id="rb-busy-text">Reading ' + total + ' photos…</span>' +
+      '<button class="btn small" type="button" id="rb-stop">Stop and keep these</button></div><div class="bar-track" id="rb-busy-track" role="progressbar" aria-label="Reading photos" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="rb-busy-bar"></span></div></div>');
+    updateChrome(); say("Reading " + total + " photos.");
+    var said = 0;
     document.getElementById("rb-stop").addEventListener("click", function () { if (rb.busy) rb.busy.stop = true; });
     function show() {
       var txt = document.getElementById("rb-busy-text"), bar = document.getElementById("rb-busy-bar");
       if (!txt) return;
       var left = done ? Math.round((Date.now() - started) / done * (total - done) / 1000) : 0;
       txt.textContent = "Reading " + done + " of " + total + " photos" + (done > 5 && left > 5 ? ", about " + (left < 90 ? left + " seconds" : Math.round(left / 60) + " minutes") + " left" : "") + "…";
-      if (bar) bar.style.width = Math.round(done / total * 100) + "%";
+      var pc = Math.round(done / total * 100), track = document.getElementById("rb-busy-track");
+      if (bar) bar.style.width = pc + "%";
+      if (track) track.setAttribute("aria-valuenow", pc);
+      if (pc >= said + 10 && done < total) { said = pc - pc % 10; say(said + "% read."); }
     }
     function finish() {
       rb.busy = null;
       rb.photos = rb.photos.concat(items).sort(function (a, b) { return a.when < b.when ? -1 : 1; });
       tidy();
+      if (rb.mode !== "add" && (!rb.title || rb.titleAuto)) {
+        var votes = {};
+        rb.photos.forEach(function (p) { var c = p.lat != null && cityOf(p.lat, p.lon); if (c) votes[c] = (votes[c] || 0) + 1; });
+        var top = Object.keys(votes).sort(function (a, b) { return votes[b] - votes[a]; })[0], yr = rb.photos[0].date.slice(0, 4);
+        rb.title = (top ? top + " " : "Holiday ") + yr; rb.titleAuto = true;
+        var ti = document.getElementById("rb-title"); if (ti) ti.value = rb.title;
+      }
       drawGroups();
+      say("Done. " + countText(items) + " read. Press Next to check the days and places.");
     }
     function pump() {
       if (rb.busy && rb.busy.stop) { if (!running) finish(); return; }
@@ -902,34 +977,6 @@
     return n ? '<div class="notice rb-left-out" role="status">' + countText(rb.photos.filter(function (p) { return p.out; })) + ' left out by you. They won\'t go in the album. <button class="btn small" type="button" id="rb-put-back">Put them all back</button></div>' : "";
   }
   function kept(p) { return !p.out && (rb.noTidy || !p.tidy || p.keep); }
-  function tidyPanel() {
-    if (rb.noTidy && !rb.photos.some(function (p) { return p.tidy; })) return "";
-    var by = { blur: [], repeat: [], similar: [], already: [] };
-    rb.photos.forEach(function (p) { if (p.tidy) by[p.tidy].push(p); });
-    var n = by.blur.length + by.repeat.length + by.similar.length + by.already.length;
-    if (!n) return '<div class="rb-tidy"><p class="tag">Tidy-up: no blurry photos, repeats or near-same shots found.</p></div>';
-    var left = rb.photos.filter(function (p) { return p.tidy && !p.keep; }).length;
-    var sect = function (key, title, text) {
-      var list = by[key]; if (!list.length) return "";
-      return '<div class="rb-tidy-sec"><h4>' + title + ' <span class="muted">' + list.length + '</span></h4><p class="tag">' + text + '</p><div class="thumbs">' +
-        list.slice(0, 120).map(function (p) {
-          var i = rb.photos.indexOf(p);
-          return '<label class="rb-tidy-pic' + (p.keep ? " kept" : "") + '">' + (p.thumb ? '<img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy">' : '<span class="ph"><small>' + esc(p.name) + '</small></span>') +
-            '<span class="check"><input type="checkbox" class="rb-keep" data-i="' + i + '"' + (p.keep ? " checked" : "") + '> Keep</span></label>';
-        }).join("") + '</div>' + (list.length > 120 ? '<p class="tag">and ' + (list.length - 120) + ' more like these.</p>' : "") +
-        '<button class="btn small rb-keep-all" type="button" data-kind="' + key + '">Keep all of these</button></div>';
-    };
-    return '<div class="rb-tidy"><h3>Tidy-up</h3><p>' + (rb.noTidy ? "Tidy-up is off, so every photo goes in the album. " :
-      'We set aside ' + left + (left < n ? ' of ' + n : '') + ' photos so the album only has the good ones: ' +
-      [by.already.length ? by.already.length + " already in the album" : "", by.blur.length ? by.blur.length + " blurry" : "", by.repeat.length ? by.repeat.length + " repeats" : "", by.similar.length ? by.similar.length + " nearly the same as another shot (we kept the sharpest)" : ""].filter(Boolean).join(", ") +
-      '. Nothing is deleted from your device. Tick Keep on any you want back.') + '</p>' +
-      '<details><summary>Look at the photos set aside</summary>' +
-      sect("already", "Already in the album", "Same date, time and file name as a photo already in this trip, so it would show twice.") +
-      sect("blur", "Blurry", "Out of focus or shaky, or a blurrier copy of a shot we kept. Very plain photos (sky, a wall) can show up here too.") +
-      sect("repeat", "Repeats", "The same photo added twice, or a copy of one already in the list.") +
-      sect("similar", "Nearly the same", "Taken within two minutes and looking almost the same as a sharper shot we kept.") +
-      '</details><label class="check"><input type="checkbox" id="rb-notidy"' + (rb.noTidy ? " checked" : "") + '> Turn tidy-up off and keep every photo</label></div>';
-  }
   // Smaller copies when there are many photos, so the holiday files stay a size GitHub accepts.
   function photoSize(n) { return n > 1500 ? { max: 960, q: 0.68 } : n > 400 ? { max: 1200, q: 0.72 } : { max: 1400, q: 0.8 }; }
 
@@ -1039,23 +1086,6 @@
     return out;
   }
 
-  var SHOW_THUMBS = 24;
-  function groupCard(g, i) {
-    var fixed = !!g.anchor;
-    return '<div class="group' + (fixed ? " matched" : "") + '"><div class="head">' +
-      (fixed ? '<h4 class="rb-stop"><span class="rb-pin" aria-hidden="true">✓</span>' + esc(g.anchor) + '</h4>'
-             : '<input type="text" id="rb-name-' + i + '" data-key="' + esc(g.key) + '" class="rb-name" value="' + esc(rb.names[g.key] || "") + '" placeholder="Place name" aria-label="Place name">') +
-      '<button class="btn small rb-out-stop" type="button" data-key="' + esc(g.key) + '">Leave out this stop</button>' +
-      '<span class="tag">' + countText(g.photos) + ' · ' + esc(g.suggest.how) +
-      (g.lat != null ? ' · <a href="https://www.google.com/maps/search/?api=1&query=' + g.lat + ',' + g.lon + '" target="_blank" rel="noopener noreferrer">see on map</a>' : "") + '</span></div>' +
-      '<input type="text" id="rb-note-' + i + '" data-key="' + esc(g.key) + '" class="rb-note" value="' + esc(rb.notes[g.key] || "") + '" placeholder="A note, for example: Ice cream by the river" aria-label="Note for ' + esc(rb.names[g.key] || "this stop") + '">' +
-      videoRow(g) +
-      '<div class="thumbs">' + g.photos.filter(function (p) { return !p.video; }).slice(0, SHOW_THUMBS).map(function (p) {
-        return '<div class="rb-thumb"><button class="rb-x" type="button" data-i="' + rb.photos.indexOf(p) + '" aria-label="Leave out ' + esc(p.name) + '" title="Leave out this photo">×</button>' +
-          (p.thumb ? '<button class="rb-rot" type="button" data-i="' + rb.photos.indexOf(p) + '" aria-label="Turn ' + esc(p.name) + ' a quarter turn to the right" title="Turn it the right way up">↻</button>' : "") + (p.thumb ? '<div class="pic loaded"><img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy"></div>' : '<div class="pic"><div class="ph"><small>' + (p.heic ? "iPhone photo" : "Can't show") + '</small>' + esc(p.name) + '</div></div>') +
-          '<span class="tag">' + esc(p.time || "") + ' ' + esc(p.name) + '</span></div>';
-      }).join("") + '</div>' + (g.photos.filter(function (p) { return !p.video; }).length > SHOW_THUMBS ? '<p class="tag">and ' + (g.photos.filter(function (p) { return !p.video; }).length - SHOW_THUMBS) + ' more photos in this group, all included</p>' : "") + '</div>';
-  }
   function countText(list) {
     var v = list.filter(function (p) { return p.video; }).length, ph = list.length - v, bits = [];
     if (ph || !v) bits.push(ph + (ph === 1 ? " photo" : " photos"));
@@ -1125,122 +1155,401 @@
   function drawGroups() {
     var out = document.getElementById("rb-out");
     if (!out) return;
-    if (!rb.photos.length) {
-      out.innerHTML = '<div class="empty" style="margin-top:18px"><b>No photos chosen yet.</b><p>Tip: photos straight from your phone keep their date and place. Photos sent through WhatsApp or downloaded from Facebook usually lose them, so use the originals from your phone or Google Photos ("Download" keeps them).</p></div>';
-      return;
-    }
-    var gs = rb.gs = groups(), T = rbTarget();
+    var k = rbStepAt().step.k;
+    rb.gs = rb.photos.length ? groups() : [];
+    out.innerHTML = k === "choose" ? chooseBody() : k === "check" ? checkBody() : k === "tidy" ? tidyPanel() : k === "videos" ? videoBody() : saveBody();
+    if (k === "save") refreshFile();
+    updateChrome();
+  }
+  function redraw() { keepPlace(drawGroups); }
+
+  // Step 1: what was read.
+  function chooseBody() {
+    if (!rb.photos.length) return '<div class="empty" style="margin-top:18px"><b>No photos chosen yet.</b><p>Tip: photos straight from your phone keep their date and place. Photos sent through WhatsApp or downloaded from Facebook usually lose them, so use the originals from your phone or Google Photos ("Download" keeps them).</p></div>';
+    var gs = rb.gs, T = rbTarget();
     var withGps = rb.photos.filter(function (p) { return p.lat != null; }).length;
     var guessed = rb.photos.filter(function (p) { return p.guessDate; }).length;
     var first = rb.photos[0].date, last = rb.photos[rb.photos.length - 1].date;
-    var outside = gs.filter(function (g) { return !g.inTrip; });
-    var html = '<div class="notice" style="margin-top:18px">' + countText(rb.photos) + ' from ' + esc(nice(first)) + ' to ' + esc(nice(last)) + '. ' +
+    return '<div class="notice" style="margin-top:18px">' + countText(rb.photos) + ' from ' + esc(nice(first)) + ' to ' + esc(nice(last)) + '. ' +
       withGps + ' have a place saved in them. ' + (guessed ? guessed + ' have no date inside, so we used the file date, which may be wrong. ' : "") +
       (T ? gs.filter(function (g) { return g.anchor; }).reduce(function (n, g) { return n + g.photos.length; }, 0) + ' matched a planned stop.' : gs.length + ' stops over ' + Object.keys(gs.reduce(function (o, g) { o[g.date] = 1; return o; }, {})).length + ' days.') + '</div>' +
-      '<div class="row" style="margin-top:12px"><button class="btn" id="rb-lookup" type="button">Look up place names online</button>' +
-      '<button class="btn" id="rb-clear" type="button">Start again</button><span class="tag" id="rb-lookup-msg"></span></div>' + leftOutNote() + tidyPanel() + ytHelpPanel();
-    var cities = T ? {} : dayCities(gs);
+      '<div class="row" style="margin-top:12px"><button class="btn" id="rb-clear" type="button">Start again</button></div>' + leftOutNote();
+  }
+
+  // Step 2: days fold to one line each. A day's photos are only drawn when it is opened.
+  function rbDays() {
+    var gs = rb.gs, T = rbTarget(), days = [];
     if (T) {
-      (T.days || []).forEach(function (d, n) {
-        var mine = gs.filter(function (g) { return g.date === d.date; });
-        var count = function (name) { return mine.filter(function (g) { return g.anchor === name; }).reduce(function (k, g) { return k.concat(g.photos); }, []); };
-        html += '<div class="rb-day"><h3>Day ' + (n + 1) + ' · ' + esc(nice(d.date, true)) + '</h3><p class="muted">' + esc(d.title || d.city || "") + '</p>' +
-          '<ul class="rb-plan">' + (d.places || []).map(function (p) { var k = count(p.name); return '<li class="' + (k.length ? "has" : "none") + '"><b>' + esc(p.name) + '</b> ' + (k.length ? countText(k) : "no photos") + '</li>'; }).join("") + '</ul>' +
-          (mine.length ? "" : '<p class="tag">No photos for this day yet.</p>') + '</div>';
-        mine.forEach(function (g) { html += groupCard(g, gs.indexOf(g)); });
-      });
-      if (outside.length) {
-        html += '<div class="rb-day"><h3>Outside the trip dates</h3><p class="muted">' + outside.reduce(function (k, g) { return k + g.photos.length; }, 0) + ' photos were taken before or after ' + esc(T.title) + ' (' + esc(niceShort(T.start)) + ' to ' + esc(nice(T.end)) + ').</p>' +
-          '<label class="check"><input type="checkbox" id="rb-outside"' + (rb.skipOutside ? "" : " checked") + '> Keep them, as extra days at the end of the trip</label></div>';
-        outside.forEach(function (g) { html += groupCard(g, gs.indexOf(g)); });
-      }
+      (T.days || []).forEach(function (d, n) { days.push({ id: d.date, label: "Day " + (n + 1) + " · " + nice(d.date, true), sub: d.title || d.city || "", plan: d.places || [], gs: gs.filter(function (g) { return g.inTrip && g.date === d.date; }) }); });
+      var outside = gs.filter(function (g) { return !g.inTrip; });
+      if (outside.length) days.push({ id: "outside", label: "Outside the trip dates", sub: "", outside: true, gs: outside });
     } else {
-      var lastDate = "", dn = 0;
-      gs.forEach(function (g, i) {
-        if (g.date !== lastDate) { dn++; html += '<div class="rb-day"><div class="row"><h3>Day ' + dn + ' · ' + esc(nice(g.date, true)) + '</h3><button class="btn small rb-out-day" type="button" data-date="' + esc(g.date) + '">Leave out this day</button></div>' + (cities[g.date] ? '<p class="muted">In ' + esc(cities[g.date]) + '</p>' : "") + '</div>'; lastDate = g.date; }
-        html += groupCard(g, i);
-      });
+      var cities = dayCities(gs), order = [];
+      gs.forEach(function (g) { if (order.indexOf(g.date) < 0) order.push(g.date); });
+      order.forEach(function (date, n) { days.push({ id: date, label: "Day " + (n + 1) + " · " + nice(date, true), sub: cities[date] || "", gs: gs.filter(function (g) { return g.date === date; }), canDrop: true }); });
     }
-    html += '<section style="margin-top:36px"><div class="section-head"><h2>Save it to the album</h2></div>' +
-      '<div class="steps" id="rb-save-steps"></div>' +
-      '<label for="rb-file" class="eyebrow">Holiday file</label><textarea id="rb-file" readonly></textarea>' +
-      '<div class="row" style="margin-top:10px"><button class="btn primary" type="button" id="rb-save">Save holiday file</button><button class="btn" type="button" id="rb-copy">Copy holiday file</button><span class="tag" id="rb-copy-msg"></span></div></section>';
-    out.innerHTML = html;
-    out.querySelectorAll(".rb-fav").forEach(function (el) { el.addEventListener("change", function () { rb.photos[+el.dataset.i].fav = el.checked; refreshFile(); }); });
-    var linkTimer = null, linkEl = null;
-    var flushLink = function () {
-      clearTimeout(linkTimer); linkTimer = null; if (!linkEl) return;
-      var el = linkEl, p = rb.photos[+el.dataset.i], k = ytKind(p.link); linkEl = null;
-      var st = document.getElementById("rb-yt-st-" + el.dataset.i); if (st) st.innerHTML = ytStatus(p.link);
-      if (k === "bad" || k === "playlist") el.setAttribute("aria-invalid", "true"); else el.removeAttribute("aria-invalid");
-      refreshFile();
+    return days;
+  }
+  function needsName(g) { return !g.anchor && !String(rb.names[g.key] || "").trim(); }
+  function dayOpen(d, total) { rb.open = rb.open || {}; return rb.needs || (rb.open[d.id] != null ? rb.open[d.id] : d.gs.length > 0 && total <= 3); }
+  function dayLine(d) {
+    var ph = d.gs.reduce(function (k, g) { return k.concat(g.photos); }, []);
+    var lo = d.outside ? 0 : rb.photos.filter(function (p) { return p.out && p.date === d.id; }).length;
+    return '<b>' + esc(d.label) + '</b>' + (d.sub ? ' · ' + esc(d.sub) : "") + ' <span class="muted">· ' + (d.gs.length ? d.gs.length + (d.gs.length === 1 ? " stop" : " stops") + ' · ' + countText(ph) : "no photos yet") + (lo ? ' · ' + lo + ' left out' : "") + '</span>';
+  }
+  function checkBody() {
+    var days = rbDays(), need = rb.gs.filter(needsName).length, withPics = days.filter(function (d) { return d.gs.length; }).length;
+    if (rb.needs && !need) rb.needs = false;
+    var html = '<div class="row rb-tools"><button class="btn" id="rb-lookup" type="button">Look up place names online</button>' +
+      (need || rb.needs ? '<button class="btn" type="button" id="rb-needs" aria-pressed="' + !!rb.needs + '">' + (rb.needs ? "Show every stop" : "Needs a name (" + need + ")") + '</button>' : "") +
+      '<span class="tag" id="rb-lookup-msg" role="status"></span></div>' +
+      '<p class="tag">Look up sends the rough spot of each stop (to about 100 metres) to OpenStreetMap to find its name. Nothing else is sent.</p>' + leftOutNote();
+    days.forEach(function (d) {
+      if (rb.needs && !d.gs.some(needsName)) return;
+      var open = dayOpen(d, withPics);
+      html += '<details class="rb-day" data-day="' + esc(d.id) + '"' + (open ? " open" : "") + '><summary>' + dayLine(d) + '</summary><div class="rb-day-body">' + (open ? dayBody(d) : "") + '</div></details>';
+    });
+    return html;
+  }
+  function dayBody(d) {
+    var T = rbTarget(), html = "";
+    if (d.plan) {
+      var count = function (name) { return d.gs.filter(function (g) { return g.anchor === name; }).reduce(function (k, g) { return k.concat(g.photos); }, []); };
+      html += '<ul class="rb-plan" aria-label="Planned stops">' + d.plan.map(function (p) { var k = count(p.name); return '<li class="' + (k.length ? "has" : "none") + '"><b>' + esc(p.name) + '</b> ' + (k.length ? countText(k) : "no photos") + '</li>'; }).join("") + '</ul>';
+    }
+    if (d.outside) html += '<p class="muted">' + d.gs.reduce(function (k, g) { return k + g.photos.length; }, 0) + ' photos were taken before or after ' + esc(T.title) + ' (' + esc(niceShort(T.start)) + ' to ' + esc(nice(T.end)) + ').</p>' +
+      '<label class="check"><input type="checkbox" id="rb-outside"' + (rb.skipOutside ? "" : " checked") + '> Keep them, as extra days at the end of the trip</label>';
+    if (d.canDrop) html += '<div class="row"><button class="btn small rb-out-day" type="button" data-date="' + esc(d.id) + '">Leave out this day</button></div>';
+    if (!d.gs.length) html += '<p class="tag">No photos for this day yet.</p>';
+    d.gs.forEach(function (g) { if (!rb.needs || needsName(g)) html += groupCard(g, rb.gs.indexOf(g)); });
+    return html;
+  }
+  // Up to 3 names to pick with one tap: from OpenStreetMap, the nearest known place, and the stop before.
+  function nameIdeas(g, i) {
+    var have = String(rb.names[g.key] || "").trim(), out = [], prev = null;
+    for (var j = i - 1; j >= 0 && !prev; j--) { var n = rb.gs[j].anchor || String(rb.names[rb.gs[j].key] || "").trim(); if (n) prev = n; }
+    [[rb.online && rb.online[g.key], ""], [g.suggest.name, ""], [prev, "Same as the stop before: "]].forEach(function (x) {
+      if (x[0] && x[0] !== have && !out.some(function (o) { return o.name === x[0]; })) out.push({ name: x[0], label: x[1] + x[0] });
+    });
+    return out.slice(0, 3);
+  }
+  function tile(p) {
+    var i = rb.photos.indexOf(p);
+    return '<div class="rb-thumb"><button class="rb-x" type="button" data-i="' + i + '" aria-label="Leave out ' + esc(p.name) + '" title="Leave out this photo">×</button>' +
+      (p.thumb ? '<button class="rb-rot" type="button" data-i="' + i + '" aria-label="Turn ' + esc(p.name) + ' a quarter turn to the right" title="Turn it the right way up">↻</button><div class="pic loaded"><img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy"></div>'
+        : '<div class="pic"><div class="ph"><small>' + (p.heic ? "iPhone photo" : "Can't show") + '</small>' + esc(p.name) + '</div></div>') +
+      '<span class="tag">' + esc(p.time || "") + ' ' + esc(p.name) + '</span></div>';
+  }
+  function groupCard(g, i) {
+    var fixed = !!g.anchor, pics = g.photos.filter(function (p) { return !p.video; }), vids = g.photos.length - pics.length;
+    rb.more = rb.more || {};
+    var show = rb.more[g.key] || 8, note = rb.notes[g.key] || "", name = rb.names[g.key] || "";
+    var ideas = fixed ? [] : nameIdeas(g, i);
+    return '<section class="group' + (fixed ? " matched" : "") + (needsName(g) ? " needs" : "") + '" data-key="' + esc(g.key) + '" aria-label="' + esc(fixed ? g.anchor : name || "A stop with no name yet") + '"><div class="head">' +
+      (fixed ? '<h4 class="rb-stop"><span class="rb-pin" aria-hidden="true">✓</span>' + esc(g.anchor) + '</h4>'
+             : '<input type="text" id="rb-name-' + i + '" data-key="' + esc(g.key) + '" class="rb-name" value="' + esc(name) + '" placeholder="Place name" aria-label="Place name">') +
+      '<button class="btn small rb-out-stop" type="button" data-key="' + esc(g.key) + '">Leave out this stop</button>' +
+      '<span class="tag">' + countText(g.photos) + ' · ' + esc(g.suggest.how) +
+      (g.lat != null ? ' · <a href="https://www.google.com/maps/search/?api=1&query=' + g.lat + ',' + g.lon + '" target="_blank" rel="noopener noreferrer">see on map</a>' : "") + '</span></div>' +
+      (ideas.length ? '<div class="rb-ideas" role="group" aria-label="Name ideas">' + ideas.map(function (x) { return '<button class="btn small rb-idea" type="button" data-key="' + esc(g.key) + '" data-name="' + esc(x.name) + '">' + esc(x.label) + '</button>'; }).join("") + '</div>' : "") +
+      '<details class="rb-note-box"' + (note ? " open" : "") + '><summary>' + (note ? "Note" : "Add a note") + '</summary>' +
+      '<input type="text" id="rb-note-' + i + '" data-key="' + esc(g.key) + '" class="rb-note" value="' + esc(note) + '" placeholder="For example: Ice cream by the river" aria-label="Note for ' + esc(fixed ? g.anchor : name || "this stop") + '"></details>' +
+      '<div class="thumbs">' + pics.slice(0, show).map(tile).join("") + '</div>' +
+      (pics.length > show ? '<button class="btn small rb-showall" type="button" data-key="' + esc(g.key) + '">' + (pics.length - show > 60 ? "Show 60 more (" + (pics.length - show) + " not shown)" : "Show all " + pics.length) + '</button>' : "") +
+      (vids ? '<p class="tag">And ' + countText(g.photos.filter(function (p) { return p.video; })) + ', set up in the Videos step.</p>' : "") + '</section>';
+  }
+  function cardFor(key) {
+    var el = null;
+    document.querySelectorAll("#rb-out section.group").forEach(function (s) { if (s.dataset.key === key) el = s; });
+    return el;
+  }
+
+  // Step 3: what tidy-up set aside, each next to the photo we kept.
+  function tidyWhy(p) {
+    if (p.tidy === "already") return "Already in this trip in the album, with the same date, time and file name.";
+    if (p.tidy === "repeat") return "The same photo as the one we kept.";
+    if (p.tidy === "blur") return p.twin ? "A blurrier copy of the one we kept." : "Looks out of focus or shaky. Very plain photos (sky, a wall) can show up here too.";
+    var s = p.twin ? Math.round(Math.abs(Date.parse(p.twin.when) - Date.parse(p.when)) / 1000) : 0;
+    return "Taken " + (s ? s + (s === 1 ? " second" : " seconds") + " apart" : "at almost the same moment") + ", and the one we kept is sharper.";
+  }
+  function tidyPanel() {
+    var by = { already: [], blur: [], repeat: [], similar: [] };
+    rb.photos.forEach(function (p) { if (p.tidy && !p.out) by[p.tidy].push(p); });
+    var n = by.blur.length + by.repeat.length + by.similar.length + by.already.length;
+    var going = rb.photos.filter(kept).length, outN = rb.photos.filter(function (p) { return p.out; }).length;
+    var aside = rb.noTidy ? 0 : rb.photos.filter(function (p) { return !p.out && p.tidy && !p.keep; }).length;
+    rb.tidyOk = rb.tidyOk || {}; rb.tidyMore = rb.tidyMore || {};
+    var html = '<p class="rb-total" id="rb-total"><b>Going in the album: ' + going + ' of ' + rb.photos.length + '</b>' + (outN ? ' <span class="muted">(' + outN + ' left out by you)</span>' : "") + '</p>';
+    if (!n) return html + '<p>No blurry photos, repeats or near-same shots found. Nothing to do here, so go on to the next step.</p>';
+    html += '<p>' + (rb.noTidy ? "Tidy-up is off, so every photo goes in the album." :
+      'We set aside ' + aside + (aside < n ? ' of ' + n : "") + ' photos: ' +
+      [by.already.length ? by.already.length + " already in the album" : "", by.blur.length ? by.blur.length + " blurry" : "", by.repeat.length ? by.repeat.length + " repeats" : "", by.similar.length ? by.similar.length + " nearly the same as another shot" : ""].filter(Boolean).join(", ") +
+      '. Nothing is deleted from your device. Tick "Keep this one too" on any you want back.') + '</p>';
+    var sect = function (key, title) {
+      var list = by[key]; if (!list.length) return "";
+      var shown = rb.tidyMore[key] || 24, ok = rb.tidyOk[key];
+      return '<details class="rb-tidy-sec"' + (ok ? "" : " open") + '><summary><b>' + title + '</b> <span class="muted">' + list.length + (ok ? " · you said this looks right" : "") + '</span></summary>' +
+        '<div class="rb-pairs">' + list.slice(0, shown).map(function (p) {
+          var i = rb.photos.indexOf(p), w = p.twin;
+          var fig = function (x, cap) { return '<figure>' + (x.thumb ? '<img src="' + u(x.thumb) + '" alt="' + esc(x.name) + '" loading="lazy">' : '<span class="ph"><small>' + esc(x.name) + '</small></span>') + '<figcaption>' + cap + '</figcaption></figure>'; };
+          return '<div class="rb-pair' + (p.keep ? " kept" : "") + '">' + (w ? fig(w, "We kept") : "") + fig(p, p.keep ? "Kept too" : "Set aside") +
+            '<p class="tag">' + esc(tidyWhy(p)) + '</p><label class="check"><input type="checkbox" class="rb-keep" data-i="' + i + '"' + (p.keep ? " checked" : "") + '> Keep this one too</label></div>';
+        }).join("") + '</div>' +
+        (list.length > shown ? '<button class="btn small rb-tidy-more" type="button" data-kind="' + key + '">Show ' + Math.min(60, list.length - shown) + ' more</button>' : "") +
+        '<div class="row"><button class="btn small rb-tidy-ok" type="button" data-kind="' + key + '">Looks right</button><button class="btn small rb-keep-all" type="button" data-kind="' + key + '">Keep all of these</button></div></details>';
     };
-    out.querySelectorAll(".rb-link").forEach(function (el) {
-      el.addEventListener("input", function () { rb.photos[+el.dataset.i].link = el.value.trim(); if (linkEl && linkEl !== el) flushLink(); linkEl = el; clearTimeout(linkTimer); linkTimer = setTimeout(flushLink, 300); });
-      el.addEventListener("change", flushLink); el.addEventListener("blur", flushLink);
+    return '<div class="rb-tidy">' + html +
+      sect("already", "Already in the album") + sect("blur", "Blurry") + sect("repeat", "Repeats") + sect("similar", "Nearly the same") +
+      '<label class="check"><input type="checkbox" id="rb-notidy"' + (rb.noTidy ? " checked" : "") + '> Turn tidy-up off and keep every photo</label></div>';
+  }
+
+  // Step 4: videos, stop by stop.
+  function videoBody() {
+    var html = ytHelpPanel();
+    rb.gs.forEach(function (g) {
+      if (!g.photos.some(function (p) { return p.video; })) return;
+      var name = g.anchor || rb.names[g.key] || "A stop with no name yet";
+      html += '<section class="group" aria-label="' + esc(name) + '"><h4 class="rb-stop">' + esc(name) + ' <span class="tag">' + esc(nice(g.date, true)) + '</span></h4>' + videoRow(g) + '</section>';
     });
-    out.querySelectorAll(".rb-keep").forEach(function (el) { el.addEventListener("change", function () { rb.photos[+el.dataset.i].keep = el.checked; drawGroups(); }); });
-    out.querySelectorAll(".rb-keep-all").forEach(function (el) { el.addEventListener("click", function () { rb.photos.forEach(function (p) { if (p.tidy === el.dataset.kind) p.keep = true; }); drawGroups(); }); });
-    out.querySelectorAll(".rb-rot").forEach(function (el) { el.addEventListener("click", function () {
-      el.disabled = true;
-      var p = rb.photos[+el.dataset.i];
-      turnItem(p).then(function () { var im = el.parentNode.querySelector("img"); if (im) im.src = p.thumb; el.disabled = false; refreshFile(); });
-    }); });
-    out.querySelectorAll(".rb-x").forEach(function (el) { el.addEventListener("click", function () { rb.photos[+el.dataset.i].out = true; drawGroups(); }); });
-    out.querySelectorAll(".rb-out-stop").forEach(function (el) { el.addEventListener("click", function () { var g = gs.filter(function (x) { return x.key === el.dataset.key; })[0]; if (g) g.photos.forEach(function (p) { p.out = true; }); drawGroups(); }); });
-    out.querySelectorAll(".rb-out-day").forEach(function (el) { el.addEventListener("click", function () { rb.photos.forEach(function (p) { if (p.date === el.dataset.date) p.out = true; }); drawGroups(); }); });
-    var pb = out.querySelector("#rb-put-back");
-    if (pb) pb.addEventListener("click", function () { rb.photos.forEach(function (p) { delete p.out; }); drawGroups(); });
-    var nt = out.querySelector("#rb-notidy");
-    if (nt) nt.addEventListener("change", function () { rb.noTidy = nt.checked; drawGroups(); });
-    var ytMatch = out.querySelector("#rb-yt-match");
-    if (ytMatch) ytMatch.addEventListener("click", function () {
-      var msg = matchLinks(out.querySelector("#rb-yt-all").value, out.querySelector("#rb-yt-newest").checked);
-      drawGroups(); refreshFile();
-      var m2 = document.getElementById("rb-yt-msg"); if (m2) m2.textContent = msg;
+    return html;
+  }
+
+  // Step 5: what will be saved, the cover, then one Save button and the files in upload order.
+  function coverIdeas() {
+    var list = rb.photos.filter(function (p) { return kept(p) && !p.video && p.thumb && p.data; });
+    var sharp = list.slice().sort(function (a, b) { return (b.sharp || 0) - (a.sharp || 0); }).slice(0, 60);
+    sharp.sort(function (a, b) { return a.when < b.when ? -1 : 1; });
+    var out = [];
+    for (var k = 0; k < 12 && k < sharp.length; k++) out.push(sharp[Math.floor(k * sharp.length / Math.min(12, sharp.length))]);
+    return out.filter(function (p, k, a) { return a.indexOf(p) === k; });
+  }
+  function saveBody() {
+    var T = rbTarget(), html = '<div id="rb-sum"></div>';
+    if (!T) {
+      var ideas = coverIdeas();
+      if (ideas.length) html += '<h3>Cover photo</h3><p class="tag">The big picture on the home page. Pick one, or leave the one we chose.</p><div class="rb-covers" role="group" aria-label="Cover photo">' +
+        '<button class="rb-cover auto" type="button" data-i="" aria-pressed="' + (rb.cover == null) + '"><span>Let the album choose</span></button>' +
+        ideas.map(function (p) { var i = rb.photos.indexOf(p); return '<button class="rb-cover" type="button" data-i="' + i + '" aria-pressed="' + (rb.cover === i) + '"><img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy"></button>'; }).join("") + '</div>';
+    }
+    return html + '<div class="rb-save-box"><div class="row"><button class="btn primary" id="rb-save" type="button">Save my holiday</button>' +
+      (window.showDirectoryPicker ? '<button class="btn" id="rb-save-dir" type="button">Save straight into the holidays folder</button>' : "") + '</div>' +
+      '<div class="bar-track" id="rb-save-bar" role="progressbar" aria-label="Saving" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span></span></div>' +
+      '<p class="tag" id="rb-copy-msg" role="status" aria-live="polite"></p></div>' +
+      '<h3>Upload them in this order</h3><p class="tag">The photo files go first and the main file last, so the album never points at a file that isn\'t there yet.</p><ol class="rb-filelist" id="rb-filelist"></ol>' +
+      '<div class="steps" id="rb-save-steps"></div>' +
+      '<details class="rb-more-opts"><summary>More options</summary><div id="rb-more-body"></div></details>' +
+      '<h3>How to check it worked</h3><ol class="rb-check-list"><li>Wait about two minutes after uploading, then open the website and reload the page.</li>' +
+      '<li>Unlock it with the family passkey. The holiday should be on the home page.</li>' +
+      '<li>Open it and look at a few days. If a note says some photos "couldn\'t load", a file is missing or has a different name: upload it again with the exact name shown above.</li></ol>';
+  }
+  function uploadOrder(names) { return names.slice(1).concat(names.slice(0, 1)); }
+  function mb(n) { return n >= 1048576 ? (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
+  function partBytes(mems) { return Math.round(mems.reduce(function (n, m) { return n + (m.image || "").length + (m.thumb || "").length + (m.clip || "").length + 300; }, 2000) * 1.37); }
+  // The list of holiday files with this trip's files in place, keeping the other trips and their order (newest first).
+  function listJs(plan) {
+    var out = (window.HOLIDAY_FILES || []).filter(function (n) { return n !== plan.names[0] && n.indexOf(plan.id + ".photos-") !== 0; }), at = out.length;
+    for (var k = 0; k < out.length; k++) {
+      var h = holidays.filter(function (x) { return x.id + ".js" === out[k]; })[0];
+      if (h && h.start < plan.hol.start) { at = k; break; }
+    }
+    out.splice.apply(out, [at, 0].concat(plan.names));
+    return "/*\n  The list of holiday files the album shows, newest first.\n  To add a holiday: put its file in this folder and add its name here.\n*/\nwindow.HOLIDAY_FILES = [\n" + out.map(function (n) { return '  "' + n + '"'; }).join(",\n") + "\n];\n";
+  }
+  function giveFile(name, text) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/javascript" }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000);
+  }
+  function markSaved(name) {
+    rb.saved = rb.saved || {}; rb.saved[name] = true;
+    document.querySelectorAll("#rb-filelist li").forEach(function (li) { if (li.dataset.name === name) li.classList.add("saved"); });
+  }
+  function saveGuard(msg) {
+    if (rb.mode === "add" && rb.target && (partsFailed[rb.target] || []).length) {
+      msg.textContent = "A photos file didn't load (" + partsFailed[rb.target].join(", ") + "). Saving now would leave out the photos in that file, so we stopped. Reload the page and try again.";
+      return false;
+    }
+    if (rb.mode === "add" && rb.target && (laterFor(rb.target).length || partsBusy[rb.target])) {
+      msg.textContent = "Still loading this trip's photos. Wait a moment and press Save again, so none of them are lost.";
+      loadParts(rb.target); return false;
+    }
+    return true;
+  }
+  function saveAll(toFolder) {
+    flushLink(); refreshFile();
+    var msg = document.getElementById("rb-copy-msg");
+    if (!saveGuard(msg)) return;
+    var pick = toFolder ? window.showDirectoryPicker({ mode: "readwrite", id: "holidays" }) : Promise.resolve(null);
+    pick.then(function (dir) {
+      return buildFiles(msg).then(function (files) {
+        var byName = {}; files.forEach(function (f) { byName[f.name] = f; });
+        var order = uploadOrder(rb.plan.names).map(function (n) { return byName[n]; });
+        if (dir) {
+          return order.reduce(function (chain, f) {
+            return chain.then(function () {
+              return dir.getFileHandle(f.name, { create: true }).then(function (fh) { return fh.createWritable(); })
+                .then(function (w) { return w.write(f.text).then(function () { return w.close(); }); }).then(function () { markSaved(f.name); });
+            });
+          }, Promise.resolve()).then(function () {
+            msg.textContent = "Saved " + order.length + (order.length === 1 ? " file" : " files") + " into the folder " + dir.name + "." + (dir.name === "holidays" ? "" : " Check that this is the website's holidays folder.") + " Now update list.js (under More options) if the names are new.";
+            say("Saved.");
+          });
+        }
+        order.forEach(function (f, i) { setTimeout(function () { giveFile(f.name, f.text); markSaved(f.name); if (i === order.length - 1) say("All files saved."); }, i * 1500); });
+        msg.textContent = order.length === 1 ? "Saved " + order[0].name + " to your Downloads folder."
+          : "Saving " + order.length + " files to your Downloads folder, in upload order. If the browser asks, allow it to download multiple files.";
+      });
+    }).catch(function (e) {
+      if (e && e.name === "AbortError") { msg.textContent = "No folder chosen, so nothing was saved."; return; }
+      msg.textContent = "This browser could not lock the files. Open the album from the website (https) and try again.";
     });
-    var ob = out.querySelector("#rb-outside");
-    if (ob) ob.addEventListener("change", function () { rb.skipOutside = !ob.checked; refreshFile(); });
-    out.querySelectorAll(".rb-name").forEach(function (el) { el.addEventListener("input", function () { rb.names[el.dataset.key] = el.value; refreshFile(); }); });
-    out.querySelectorAll(".rb-note").forEach(function (el) { el.addEventListener("input", function () { rb.notes[el.dataset.key] = el.value; refreshFile(); }); });
-    out.querySelector("#rb-clear").addEventListener("click", function () { rb.photos = []; rb.names = {}; rb.notes = {}; rb.online = {}; drawGroups(); });
-    out.querySelector("#rb-lookup").addEventListener("click", function () { lookupOnline(gs); });
-    out.querySelector("#rb-save").addEventListener("click", function () {
-      flushLink();
-      var msg = document.getElementById("rb-copy-msg");
-      if (rb.mode === "add" && rb.target && (partsFailed[rb.target] || []).length) {
-        msg.textContent = "A photos file didn't load (" + partsFailed[rb.target].join(", ") + "). Saving now would leave out the photos in that file, so we stopped. Reload the page and try again.";
-        return;
+  }
+
+  // YouTube links save a moment after typing stops, and at once on leaving the box or on Save.
+  var linkTimer = null, linkEl = null;
+  function flushLink() {
+    clearTimeout(linkTimer); linkTimer = null; if (!linkEl) return;
+    var el = linkEl, p = rb.photos[+el.dataset.i], k = ytKind(p.link); linkEl = null;
+    var st = document.getElementById("rb-yt-st-" + el.dataset.i); if (st) st.innerHTML = ytStatus(p.link);
+    if (k === "bad" || k === "playlist") el.setAttribute("aria-invalid", "true"); else el.removeAttribute("aria-invalid");
+  }
+  function stopName(g) { return g ? g.anchor || String(rb.names[g.key] || "").trim() || "this stop" : "this stop"; }
+  function leaveOut(list, text, focusKey, focusI) {
+    list.forEach(function (p) { p.out = true; });
+    redraw();
+    say(text, function () { list.forEach(function (p) { delete p.out; }); redraw(); say("Put back."); });
+    var f = focusI != null && document.querySelector('#rb-out .rb-x[data-i="' + focusI + '"]');
+    if (!f && focusKey) { var c = cardFor(focusKey); f = c && (c.querySelector(".rb-x") || c.querySelector("input, button")); }
+    if (!f) f = document.getElementById("rb-step-h");
+    if (f) f.focus({ preventScroll: true });
+  }
+  function rbClick(e) {
+    var b = e.target.closest && e.target.closest("button");
+    if (!b || b.disabled) return;
+    var d = b.dataset, id = b.id;
+    if (d.go) return goStep(d.go);
+    if (id === "rb-undo") { var fn = rb.undo; rb.undo = null; document.getElementById("rb-toast").hidden = true; if (fn) fn(); return; }
+    if (b.classList.contains("rb-x")) {
+      var p = rb.photos[+d.i], g = rb.gs.filter(function (x) { return x.photos.indexOf(p) >= 0; })[0];
+      var tiles = Array.prototype.slice.call(b.closest(".thumbs").querySelectorAll(".rb-x")), at = tiles.indexOf(b);
+      var nb = tiles[at + 1] || tiles[at - 1], left = g ? g.photos.length - 1 : 0;
+      return leaveOut([p], p.name + " left out, " + left + " left in " + stopName(g) + ".", g && g.key, nb ? nb.dataset.i : null);
+    }
+    if (b.classList.contains("rb-rot")) {
+      b.disabled = true;
+      var rp = rb.photos[+d.i];
+      turnItem(rp).then(function () { var im = b.parentNode.querySelector("img"); if (im) im.src = rp.thumb; b.disabled = false; say(rp.name + " turned."); });
+      return;
+    }
+    if (b.classList.contains("rb-out-stop")) {
+      var sg = rb.gs.filter(function (x) { return x.key === d.key; })[0];
+      if (sg) leaveOut(sg.photos.slice(), stopName(sg) + " left out (" + countText(sg.photos) + ").");
+      return;
+    }
+    if (b.classList.contains("rb-out-day")) {
+      var dl = rb.photos.filter(function (x) { return !x.out && x.date === d.date; });
+      return leaveOut(dl, nice(d.date, true) + " left out (" + countText(dl) + ").");
+    }
+    if (b.classList.contains("rb-showall")) {
+      rb.more = rb.more || {};
+      var was = rb.more[d.key] || 8, cg = rb.gs.filter(function (x) { return x.key === d.key; })[0], card = cardFor(d.key);
+      rb.more[d.key] = was + 60;
+      if (cg && card) {
+        card.outerHTML = groupCard(cg, rb.gs.indexOf(cg));
+        var nc = cardFor(d.key), first = nc && nc.querySelectorAll(".rb-x")[was];
+        if (first) first.focus();
+        say("Showing " + Math.min(rb.more[d.key], cg.photos.length) + " photos.");
       }
-      if (rb.mode === "add" && rb.target && (laterFor(rb.target).length || partsBusy[rb.target])) {
-        msg.textContent = "Still loading this trip's photos. Wait a moment and press Save again, so none of them are lost.";
-        loadParts(rb.target); return;
-      }
-      buildFiles(msg).then(function (files) {
-        files.forEach(function (f, i) {
-          setTimeout(function () {
-            var a = document.createElement("a");
-            a.href = URL.createObjectURL(new Blob([f.text], { type: "text/javascript" }));
-            a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000);
-          }, i * 1500);
-        });
-        msg.textContent = files.length === 1 ? "Saved " + files[0].name + " to your Downloads folder."
-          : "Saving " + files.length + " files to your Downloads folder. If the browser asks, allow it to download multiple files.";
-      }, function () { msg.textContent = "This browser could not lock the file. Open the album from the website (https) and try again."; });
-    });
-    out.querySelector("#rb-copy").addEventListener("click", function () {
+      return;
+    }
+    if (b.classList.contains("rb-idea")) {
+      rb.names[d.key] = d.name;
+      var c2 = cardFor(d.key), inp = c2 && c2.querySelector(".rb-name");
+      if (inp) { inp.value = d.name; inp.focus(); }
+      b.parentNode.querySelectorAll(".rb-idea").forEach(function (x) { if (x.dataset.name === d.name) x.remove(); });
+      updateNeeds(); say("Named " + d.name + ".");
+      return;
+    }
+    if (id === "rb-needs") { rb.needs = !rb.needs; drawGroups(); var nb2 = document.getElementById("rb-needs"); if (nb2) nb2.focus(); return; }
+    if (id === "rb-lookup") return lookupOnline(rb.gs);
+    if (id === "rb-clear") { rb.photos = []; rb.names = {}; rb.notes = {}; rb.online = {}; rb.more = {}; rb.cover = null; if (rb.titleAuto) rb.title = ""; return goStep("choose"); }
+    if (id === "rb-put-back") { var back = rb.photos.filter(function (x) { return x.out; }); back.forEach(function (x) { delete x.out; }); redraw(); say(countText(back) + " put back."); return; }
+    if (b.classList.contains("rb-keep-all")) {
+      var kl = rb.photos.filter(function (x) { return x.tidy === d.kind && !x.keep && !x.out; });
+      kl.forEach(function (x) { x.keep = true; }); redraw();
+      say(countText(kl) + " kept.", function () { kl.forEach(function (x) { delete x.keep; }); redraw(); say("Set aside again."); });
+      return;
+    }
+    if (b.classList.contains("rb-tidy-ok")) { rb.tidyOk[d.kind] = true; redraw(); say("Done. That group is folded away."); return; }
+    if (b.classList.contains("rb-tidy-more")) { rb.tidyMore[d.kind] = (rb.tidyMore[d.kind] || 24) + 60; redraw(); return; }
+    if (id === "rb-yt-match") {
+      var m = matchLinks(document.getElementById("rb-yt-all").value, document.getElementById("rb-yt-newest").checked);
+      redraw(); var m2 = document.getElementById("rb-yt-msg"); if (m2) m2.textContent = m;
+      return;
+    }
+    if (b.classList.contains("rb-cover")) {
+      rb.cover = d.i === "" ? null : +d.i;
+      document.querySelectorAll(".rb-cover").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      refreshFile(); return;
+    }
+    if (id === "rb-save") return saveAll(false);
+    if (id === "rb-save-dir") return saveAll(true);
+    if (b.classList.contains("rb-again")) {
+      var f = rb.built && rb.built.files.filter(function (x) { return x.name === d.name; })[0];
+      if (f) giveFile(f.name, f.text); else saveAll(false);
+      return;
+    }
+    if (id === "rb-list-js") return giveFile("list.js", listJs(rb.plan));
+    if (id === "rb-copy") {
       flushLink();
       var ta = document.getElementById("rb-file"), msg = document.getElementById("rb-copy-msg");
+      if (!saveGuard(msg)) return;
       buildFiles(msg).then(function (files) {
-        if (files.length > 1 || files[0].text.length > 1500000) { msg.textContent = "Too big to copy. Use Save holiday file instead."; return; }
+        if (files.length > 1 || files[0].text.length > 1500000) { msg.textContent = "Too big to copy. Use Save my holiday instead."; return; }
         ta.value = files[0].text;
-        var done = function () { msg.textContent = "Copied. Paste it into Notepad and save it as described above."; };
+        var done = function () { msg.textContent = "Copied. Paste it into Notepad and save it with the name shown above."; };
         try { navigator.clipboard.writeText(files[0].text).then(done, function () { ta.select(); msg.textContent = "Press Ctrl+C (or Cmd+C) to copy the selected text."; }); }
-        catch (e) { ta.select(); msg.textContent = "Press Ctrl+C (or Cmd+C) to copy the selected text."; }
+        catch (err) { ta.select(); msg.textContent = "Press Ctrl+C (or Cmd+C) to copy the selected text."; }
       }, function () { msg.textContent = "This browser could not lock the file. Open the album from the website (https) and try again."; });
+    }
+  }
+  function updateNeeds() {
+    var nb = document.getElementById("rb-needs"); if (!nb || rb.needs) return;
+    nb.textContent = "Needs a name (" + rb.gs.filter(needsName).length + ")";
+    document.querySelectorAll("#rb-out section.group").forEach(function (s) {
+      var g = rb.gs.filter(function (x) { return x.key === s.dataset.key; })[0];
+      if (g) s.classList.toggle("needs", needsName(g));
     });
-    refreshFile();
+  }
+  function rbInput(e) {
+    var el = e.target, c = el.classList;
+    if (c.contains("rb-name")) { rb.names[el.dataset.key] = el.value; updateNeeds(); }
+    else if (c.contains("rb-note")) rb.notes[el.dataset.key] = el.value;
+    else if (c.contains("rb-link")) { rb.photos[+el.dataset.i].link = el.value.trim(); if (linkEl && linkEl !== el) flushLink(); linkEl = el; clearTimeout(linkTimer); linkTimer = setTimeout(flushLink, 300); }
+  }
+  function rbChange(e) {
+    var el = e.target, c = el.classList;
+    if (c.contains("rb-link")) flushLink();
+    else if (c.contains("rb-fav")) rb.photos[+el.dataset.i].fav = el.checked;
+    else if (c.contains("rb-keep")) {
+      var p = rb.photos[+el.dataset.i]; p.keep = el.checked;
+      var pair = el.closest(".rb-pair"); if (pair) { pair.classList.toggle("kept", el.checked); var cap = pair.querySelectorAll("figcaption"); cap[cap.length - 1].textContent = el.checked ? "Kept too" : "Set aside"; }
+      var tot = document.getElementById("rb-total"); if (tot) tot.querySelector("b").textContent = "Going in the album: " + rb.photos.filter(kept).length + " of " + rb.photos.length;
+    }
+    else if (el.id === "rb-notidy") { rb.noTidy = el.checked; redraw(); }
+    else if (el.id === "rb-outside") rb.skipOutside = !el.checked;
+  }
+  // A day's photos are drawn when it is opened, and cleared when it is closed, so long trips stay quick.
+  function rbToggle(e) {
+    var d = e.target;
+    if (!d.classList || !d.classList.contains("rb-day")) return;
+    rb.open = rb.open || {}; rb.open[d.dataset.day] = d.open;
+    var body = d.querySelector(".rb-day-body");
+    if (!d.open) { body.innerHTML = ""; return; }
+    if (body.innerHTML) return;
+    var day = rbDays().filter(function (x) { return x.id === d.dataset.day; })[0];
+    if (day) body.innerHTML = dayBody(day);
   }
 
   // Ask OpenStreetMap for the name of each place, one every 1.2 seconds (their rule).
@@ -1251,10 +1560,14 @@
     rb.online = rb.online || {};
     var i = 0, failed = 0;
     (function next() {
-      if (i >= todo.length) { msg.textContent = failed === todo.length ? "Could not reach OpenStreetMap from here. Open the album from your computer or the website to use this." : "Place names updated. Check them below."; drawGroups(); return; }
+      if (i >= todo.length) {
+        var end = failed === todo.length ? "Could not reach OpenStreetMap from here. Open the album from your computer or the website to use this." : "Place names updated. Check them below, and tap a name idea to use it.";
+        redraw(); var m2 = document.getElementById("rb-lookup-msg"); if (m2) m2.textContent = end; say(end); return;
+      }
       var g = todo[i++];
-      msg.textContent = "Looking up " + i + " of " + todo.length + "…";
-      fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&accept-language=en&lat=" + g.lat + "&lon=" + g.lon)
+      msg = document.getElementById("rb-lookup-msg") || msg;
+      if (msg) msg.textContent = "Looking up " + i + " of " + todo.length + "…";
+      fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&accept-language=en&lat=" + g.lat.toFixed(3) + "&lon=" + g.lon.toFixed(3))
         .then(function (r) { return r.json(); })
         .then(function (d) {
           var a = d.address || {};
@@ -1271,8 +1584,7 @@
   function slug(s) { return String(s || "holiday").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "holiday"; }
 
   function refreshFile() {
-    var ta = document.getElementById("rb-file");
-    if (!ta || !rb.photos.length) return;
+    if (!rb.photos.length) return;
     var gs = rb.gs || groups();
     var target = rbTarget();
     var keep = gs.filter(function (g) { return !(target && !g.inTrip && rb.skipOutside); });
@@ -1299,7 +1611,6 @@
         memories.push(m);
       });
     });
-    var steps = document.getElementById("rb-save-steps");
     var hol, isNew = !target;
     if (target) {
       // The whole trip again, with the new photos added (the same file names replace the old ones).
@@ -1334,7 +1645,7 @@
       var cityList = route.map(function (r) { return r.city; }).filter(function (c, i, a) { return a.indexOf(c) === i; });
       hol = {
         id: id, title: rb.title || "Our holiday", subtitle: rb.sub || cityList.slice(0, 5).join(", "), start: first, end: last,
-        cover: { image: memories[0] ? memories[Math.floor(memories.length / 3)].image : "" },
+        cover: { image: rb.cover != null && rb.photos[rb.cover] && kept(rb.photos[rb.cover]) && rb.photos[rb.cover].data ? rb.photos[rb.cover].data : memories[0] ? memories[Math.floor(memories.length / 3)].image : "" },
         summary: days.length + " days and " + countText(memories.map(function (m) { return { video: m.kind === "video" }; })) + (cityList.length ? ", from " + cityList.slice(0, 6).join(" to ") : "") + ".",
         route: route, days: days, memories: memories
       };
@@ -1348,16 +1659,35 @@
     });
     var names = parts.map(function (x, i) { return i ? id + ".photos-" + (i + 1) + ".js" : id + ".js"; });
     rb.plan = { hol: hol, parts: parts, names: names, id: id };
-    rb.built = null;
-    var listLine = names.map(function (n) { return '"' + esc(n) + '",'; }).join("</code> <code>").replace(/,$/, "");
-    var skipped = rb.photos.filter(function (p) { return kept(p) && !p.data; }).length;
-    steps.innerHTML = '<div><b>Save the ' + (names.length > 1 ? names.length + ' holiday files' : 'holiday file') + '</b><p class="muted">Press <b>Save holiday file</b> below. Your photos are inside, locked with your passkey, with their hidden phone data removed.' +
-      (names.length > 1 ? ' There are ' + hol.memories.length + ' photos, so they are split into ' + names.length + ' files.' : '') +
-      (skipped ? ' ' + skipped + ' photos could not be added (iPhone HEIC photos, or files the browser could not open). Change them to JPG first.' : '') + '</p></div>' +
-      '<div><b>Put it in the website</b><p class="muted">Move the saved ' + (names.length > 1 ? 'files' : 'file') + ' into the <code>holidays</code> folder' + (isNew ? '' : ', replacing the old ones') + ': <code>' + names.map(esc).join('</code>, <code>') + '</code>.</p></div>' +
-      '<div><b>Add it to the list</b><p class="muted">Open <code>holidays/list.js</code> and add <code>' + listLine + '</code>' + (isNew ? '' : ' (any names not there yet)') + '. Then open index.html.</p></div>' +
+    rb.built = null; rb.saved = {};
+    var sum = document.getElementById("rb-sum");
+    if (!sum) return;
+    var sizes = {}, total = 0;
+    parts.forEach(function (x, i) { sizes[names[i]] = partBytes(x); total += sizes[names[i]]; });
+    var newMems = memories.length, vids = memories.filter(function (m) { return m.kind === "video"; }), clips = rb.photos.filter(function (p) { return kept(p) && p.video && p.fav; }).length;
+    var skipped = rb.photos.filter(function (p) { return kept(p) && !p.data; }).length, aside = rb.photos.length - rb.photos.filter(kept).length;
+    var pct = Math.min(100, Math.round(total / 1073741824 * 100));
+    sum.innerHTML = '<div class="rb-sum"><p><b>' + (isNew ? esc(hol.title) : "Adding to " + esc(hol.title)) + '</b>: ' + countText(memories.map(function (m) { return { video: m.kind === "video" }; })) +
+      (isNew ? ' over ' + hol.days.length + (hol.days.length === 1 ? " day" : " days") + ' and ' + hol.days.reduce(function (n, d) { return n + d.places.length; }, 0) + ' stops' : ' (the trip will then have ' + hol.memories.length + ' in all)') + '.' +
+      (clips ? ' ' + clips + (clips === 1 ? " video gets" : " videos get") + ' a 20-second clip.' : "") + (vids.filter(function (m) { return m.yt; }).length ? ' ' + vids.filter(function (m) { return m.yt; }).length + ' linked to YouTube.' : "") +
+      (aside ? ' ' + aside + ' set aside or left out.' : "") + (skipped ? ' ' + skipped + ' could not be added (iPhone HEIC photos, or files the browser could not open). Change them to JPG first.' : "") + '</p>' +
+      '<p>This saves ' + (names.length === 1 ? "1 file" : names.length + " files") + ', about ' + mb(total) + ' in all.</p>' +
+      '<div class="rb-meter" aria-hidden="true"><span style="width:' + Math.max(1, pct) + '%"></span></div>' +
+      '<p class="tag">GitHub Pages allows about 1 GB for the whole website, and this holiday uses ' + (pct < 1 ? "less than 1%" : "about " + pct + "%") + ' of it. Every save also stays in GitHub\'s history, so save a big trip once rather than many times.</p></div>';
+    document.getElementById("rb-filelist").innerHTML = uploadOrder(names).map(function (n, k) {
+      return '<li data-name="' + esc(n) + '"' + (rb.saved[n] ? ' class="saved"' : "") + '><span class="rb-tick" aria-hidden="true"></span><code>' + esc(n) + '</code> <span class="tag">about ' + mb(sizes[n]) + (k === names.length - 1 && names.length > 1 ? ", the main file, last" : "") + '</span>' +
+        '<button class="btn small rb-again" type="button" data-name="' + esc(n) + '">Download again</button></li>';
+    }).join("");
+    document.getElementById("rb-save-steps").innerHTML = '<div><b>Save</b><p class="muted">Press <b>Save my holiday</b>. Your photos are inside, locked with your passkey, with their hidden phone data removed.</p></div>' +
+      '<div><b>Put them in the website</b><p class="muted">Move the saved ' + (names.length > 1 ? 'files' : 'file') + ' into the <code>holidays</code> folder' + (isNew ? '' : ', replacing the old ones') + ', in the order above.</p></div>' +
+      '<div><b>Update the list</b><p class="muted">' + (listJs(rb.plan) === listJsNow() ? 'The list already has these names, so there is nothing to change.' : 'Download the new <code>list.js</code> under More options and put it in the same folder, replacing the old one.') + '</p></div>' +
       '<div><b>Or ask Claude</b><p class="muted">Send Claude the saved ' + (names.length > 1 ? 'files' : 'file') + ', and it will put them in the album for you.</p></div>';
-    ta.value = hol.memories.length + " photos ready. Press Save holiday file to lock them with your passkey and save.";
+    var small = names.length === 1 && total < 1500000;
+    document.getElementById("rb-more-body").innerHTML = '<div class="row"><button class="btn" type="button" id="rb-list-js">Download the new list.js</button><span class="tag">Keeps the other trips and their order.</span></div>' +
+      (small ? '<label for="rb-file" class="eyebrow">Holiday file as text</label><textarea id="rb-file" readonly placeholder="Press Copy to lock it and show it here"></textarea><div class="row"><button class="btn" type="button" id="rb-copy">Copy holiday file</button></div>' : "");
+  }
+  function listJsNow() {
+    return "/*\n  The list of holiday files the album shows, newest first.\n  To add a holiday: put its file in this folder and add its name here.\n*/\nwindow.HOLIDAY_FILES = [\n" + (window.HOLIDAY_FILES || []).map(function (n) { return '  "' + n + '"'; }).join(",\n") + "\n];\n";
   }
   // Lock each part with the passkey, one after another, showing progress.
   function buildFiles(msg) {
@@ -1380,12 +1710,18 @@
     return plan.parts.reduce(function (chain, mems, i) {
       return chain.then(function () {
         if (msg) msg.textContent = "Locking " + (plan.parts.length > 1 ? "file " + (i + 1) + " of " + plan.parts.length : "the holiday file") + "…";
+        var bar = document.getElementById("rb-save-bar");
+        if (bar) { var pc = Math.round(i / plan.parts.length * 100); bar.hidden = false; bar.setAttribute("aria-valuenow", pc); bar.firstChild.style.width = pc + "%"; }
         var body = i ? { partOf: plan.id, part: i + 1, memories: mems } : Object.assign({}, plan.hol, { memories: mems, photoParts: plan.parts.length });
         return lockHoliday(body, unlockedKey).then(function (box) {
           files.push({ name: plan.names[i], text: "/* " + plan.hol.title + (i ? ", photos part " + (i + 1) : "") + ". Holiday file made by Rebuild from photos on " + stamp + ". Locked with the album passkey. Save as holidays/" + plan.names[i] + " */\nHolidayAlbum.addLocked(" + JSON.stringify(box) + ");\n" });
         });
       });
-    }, Promise.resolve()).then(function () { rb.built = { plan: plan, files: files }; return files; });
+    }, Promise.resolve()).then(function () {
+      var bar = document.getElementById("rb-save-bar");
+      if (bar) { bar.setAttribute("aria-valuenow", 100); bar.firstChild.style.width = "100%"; }
+      rb.built = { plan: plan, files: files }; return files;
+    });
   }
   var refreshSeq = 0;
 
@@ -1573,7 +1909,7 @@
     if (lockBtn) lockBtn.addEventListener("click", function () { HolidayAlbum.lock(); });
     wirePics(root);
     if (!/-day\d+$/.test(id)) window.scrollTo(0, 0);
-    document.title = (h ? h.title + " · " : id === "rebuild" ? "Rebuild from photos · " : "") + "Family Holiday Album";
+    document.title = (h ? h.title + " · " : id === "rebuild" ? "Add your photos · " : "") + "Family Holiday Album";
   }
 
   window.HolidayAlbum = {
