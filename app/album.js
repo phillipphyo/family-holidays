@@ -1228,9 +1228,9 @@
     var names = parts.map(function (x, i) { return i ? id + ".photos-" + (i + 1) + ".js" : id + ".js"; });
     rb.plan = { hol: hol, parts: parts, names: names, id: id };
     rb.built = null;
-    var listLine = names.map(function (n) { return '"' + esc(n) + '",'; }).join("</code> <code>");
+    var listLine = names.map(function (n) { return '"' + esc(n) + '",'; }).join("</code> <code>").replace(/,$/, "");
     var skipped = rb.photos.filter(function (p) { return kept(p) && !p.data; }).length;
-    steps.innerHTML = '<div><b>Save the holiday ' + (names.length > 1 ? names.length + ' files' : 'file') + '</b><p class="muted">Press <b>Save holiday file</b> below. Your photos are inside, locked with your passkey, with their hidden phone data removed.' +
+    steps.innerHTML = '<div><b>Save the ' + (names.length > 1 ? names.length + ' holiday files' : 'holiday file') + '</b><p class="muted">Press <b>Save holiday file</b> below. Your photos are inside, locked with your passkey, with their hidden phone data removed.' +
       (names.length > 1 ? ' There are ' + hol.memories.length + ' photos, so they are split into ' + names.length + ' files.' : '') +
       (skipped ? ' ' + skipped + ' photos could not be added (iPhone HEIC photos, or files the browser could not open). Change them to JPG first.' : '') + '</p></div>' +
       '<div><b>Put it in the website</b><p class="muted">Move the saved ' + (names.length > 1 ? 'files' : 'file') + ' into the <code>holidays</code> folder' + (isNew ? '' : ', replacing the old ones') + ': <code>' + names.map(esc).join('</code>, <code>') + '</code>.</p></div>' +
