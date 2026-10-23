@@ -767,6 +767,23 @@
     }
     ph.forEach(function (p) { if (!p.tidy && p.sharp < blurLine) p.tidy = "blur"; });
   }
+  // Turn a picture a quarter turn to the right (for photos whose camera didn't save which way up it was held).
+  function turnPic(src) {
+    return new Promise(function (resolve) {
+      if (!src) return resolve(src);
+      var img = new Image();
+      img.onload = function () {
+        var c = document.createElement("canvas"); c.width = img.naturalHeight; c.height = img.naturalWidth;
+        var g = c.getContext("2d"); g.translate(c.width, 0); g.rotate(Math.PI / 2); g.drawImage(img, 0, 0);
+        var out = c.toDataURL("image/jpeg", 0.85); c.width = c.height = 0; resolve(out);
+      };
+      img.onerror = function () { resolve(src); };
+      img.src = src;
+    });
+  }
+  function turnItem(p) {
+    return Promise.all([turnPic(p.data), turnPic(p.thumb)]).then(function (r) { p.data = r[0]; p.thumb = r[1]; p.turned = ((p.turned || 0) + 1) % 4; });
+  }
   function leftOutNote() {
     var n = rb.photos.filter(function (p) { return p.out; }).length;
     return n ? '<div class="notice rb-left-out" role="status">' + countText(rb.photos.filter(function (p) { return p.out; })) + ' left out by you. They won\'t go in the album. <button class="btn small" type="button" id="rb-put-back">Put them all back</button></div>' : "";
@@ -920,7 +937,8 @@
       '<input type="text" id="rb-note-' + i + '" data-key="' + esc(g.key) + '" class="rb-note" value="' + esc(rb.notes[g.key] || "") + '" placeholder="A note, for example: Ice cream by the river" aria-label="Note for ' + esc(rb.names[g.key] || "this stop") + '">' +
       videoRow(g) +
       '<div class="thumbs">' + g.photos.filter(function (p) { return !p.video; }).slice(0, SHOW_THUMBS).map(function (p) {
-        return '<div class="rb-thumb"><button class="rb-x" type="button" data-i="' + rb.photos.indexOf(p) + '" aria-label="Leave out ' + esc(p.name) + '" title="Leave out this photo">×</button>' + (p.thumb ? '<div class="pic loaded"><img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy"></div>' : '<div class="pic"><div class="ph"><small>' + (p.heic ? "iPhone photo" : "Can't show") + '</small>' + esc(p.name) + '</div></div>') +
+        return '<div class="rb-thumb"><button class="rb-x" type="button" data-i="' + rb.photos.indexOf(p) + '" aria-label="Leave out ' + esc(p.name) + '" title="Leave out this photo">×</button>' +
+          (p.thumb ? '<button class="rb-rot" type="button" data-i="' + rb.photos.indexOf(p) + '" aria-label="Turn ' + esc(p.name) + ' a quarter turn to the right" title="Turn it the right way up">↻</button>' : "") + (p.thumb ? '<div class="pic loaded"><img src="' + u(p.thumb) + '" alt="' + esc(p.name) + '" loading="lazy"></div>' : '<div class="pic"><div class="ph"><small>' + (p.heic ? "iPhone photo" : "Can't show") + '</small>' + esc(p.name) + '</div></div>') +
           '<span class="tag">' + esc(p.time || "") + ' ' + esc(p.name) + '</span></div>';
       }).join("") + '</div>' + (g.photos.filter(function (p) { return !p.video; }).length > SHOW_THUMBS ? '<p class="tag">and ' + (g.photos.filter(function (p) { return !p.video; }).length - SHOW_THUMBS) + ' more photos in this group, all included</p>' : "") + '</div>';
   }
@@ -1049,6 +1067,11 @@
     });
     out.querySelectorAll(".rb-keep").forEach(function (el) { el.addEventListener("change", function () { rb.photos[+el.dataset.i].keep = el.checked; drawGroups(); }); });
     out.querySelectorAll(".rb-keep-all").forEach(function (el) { el.addEventListener("click", function () { rb.photos.forEach(function (p) { if (p.tidy === el.dataset.kind) p.keep = true; }); drawGroups(); }); });
+    out.querySelectorAll(".rb-rot").forEach(function (el) { el.addEventListener("click", function () {
+      el.disabled = true;
+      var p = rb.photos[+el.dataset.i];
+      turnItem(p).then(function () { var im = el.parentNode.querySelector("img"); if (im) im.src = p.thumb; el.disabled = false; refreshFile(); });
+    }); });
     out.querySelectorAll(".rb-x").forEach(function (el) { el.addEventListener("click", function () { rb.photos[+el.dataset.i].out = true; drawGroups(); }); });
     out.querySelectorAll(".rb-out-stop").forEach(function (el) { el.addEventListener("click", function () { var g = gs.filter(function (x) { return x.key === el.dataset.key; })[0]; if (g) g.photos.forEach(function (p) { p.out = true; }); drawGroups(); }); });
     out.querySelectorAll(".rb-out-day").forEach(function (el) { el.addEventListener("click", function () { rb.photos.forEach(function (p) { if (p.date === el.dataset.date) p.out = true; }); drawGroups(); }); });

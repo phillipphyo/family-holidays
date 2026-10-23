@@ -42,7 +42,8 @@ self.onmessage = function (e) {
     if (dt instanceof Date && !isNaN(dt)) out.dt = dt.getTime();
     if (tags && typeof tags.latitude === "number" && typeof tags.longitude === "number") { out.lat = tags.latitude; out.lon = tags.longitude; }
     if (job.heic) return null;
-    return createImageBitmap(file).then(function (bmp) {
+    // Turn the picture the way the camera says it was held (the orientation tag), so nothing comes out sideways.
+    return createImageBitmap(file, { imageOrientation: "from-image" }).then(function (bmp) {
       return draw(bmp, job.max, job.q).then(function (data) {
         out.data = data;
         return draw(bmp, 240, 0.7, out);

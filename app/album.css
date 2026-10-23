@@ -606,6 +606,8 @@ figure.vid a { display: block; color: inherit; }
   display: grid; place-items: center; font: 600 16px/1 var(--body); color: #fff; background: rgba(10, 14, 28, .7); border: 1px solid rgba(255, 255, 255, .6); cursor: pointer;
 }
 .rb-x:hover { background: rgba(176, 0, 32, .85); }
-@media (pointer: coarse) { .rb-x { width: 36px; height: 36px; } }
+.rb-rot { position: absolute; top: 4px; left: 4px; z-index: 2; width: 28px; height: 28px; border-radius: 50%; padding: 0; display: grid; place-items: center; font: 600 15px/1 var(--body); color: #fff; background: rgba(10, 14, 28, .7); border: 1px solid rgba(255, 255, 255, .6); cursor: pointer; }
+.rb-rot:hover { background: rgba(42, 58, 143, .9); }
+@media (pointer: coarse) { .rb-x, .rb-rot { width: 36px; height: 36px; } }
 .rb-day .row { justify-content: space-between; align-items: center; gap: 10px; }
 .group .head .rb-out-stop { order: 3; }
