@@ -109,7 +109,7 @@
     var alt = opts.area || (opts.decorative ? "" : opts.name || "");
     return '<div class="pic' + (opts.cls ? " " + opts.cls : "") + '" style="--tone:' + tone(opts.type) + '" data-wiki="' + esc(wiki) + '" data-area="' + esc(opts.area || "") + '">' +
       '<div class="ph" aria-hidden="true"><small>' + esc(opts.label || TYPE_LABEL[opts.type] || "") + '</small>' + esc(opts.name || "") + '</div>' +
-      (src ? '<img src="' + u(src) + '" alt="' + esc(alt) + '" loading="lazy">' : "") +
+      (src ? '<img src="' + u(src) + '" alt="' + esc(alt) + '" loading="lazy">' : opts.vk ? '<img data-vk="' + esc(opts.vk) + '" alt="' + esc(alt) + '">' : "") +
       (opts.area ? '<span class="pic-tag" aria-hidden="true">' + esc(opts.area) + '</span>' : "") +
       (src && !opts.image && opts.wiki && !opts.inLink ? credit : "") +
       (opts.credit && opts.inLink ? '<span class="credit">' + esc(creditText(opts.credit)) + '</span>' : "") +
@@ -311,7 +311,7 @@
       ((h.memories || []).length ? '<div><span class="eyebrow">Photos</span><b>' + h.memories.length + '</b></div>' : "") + '</div>' +
       (h.walkingTotal ? '<p class="muted walk-total">' + esc(h.walkingTotal) + '</p>' : "") +
       ((h.journeyTips || []).length ? '<div class="tipbox"><h4><span aria-hidden="true">🚆</span> Getting around, every day</h4><ul>' + h.journeyTips.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>' +
-        (h.journeyNote ? '<p class="muted">' + esc(h.journeyNote) + '</p>' : "") + '</div>' : "") + (past ? infoBox(h) : "") +
+        (h.journeyNote ? '<p class="muted">' + esc(h.journeyNote) + '</p>' : "") + '</div>' : "") + (past ? infoBox(h) : "") + quickBox(h) +
       '<div class="summary">' + (h.travellers ? '<p class="eyebrow">' + esc(h.travellers) + '</p>' : "") + (h.summary ? '<p>' + esc(h.summary) + '</p>' : "") +
       ((h.links || []).length ? '<div class="links">' + h.links.map(function (l, i) { return '<a class="btn' + (i ? "" : " primary") + '" href="' + u(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.label) + '</a>'; }).join("") + '</div>' : "") + '</div>';
 
@@ -324,12 +324,14 @@
         }).join("") + '</div></section>';
     }
 
-    if ((h.stays || []).length) {
-      html += '<section><div class="section-head"><h2>Where we stay</h2><span class="eyebrow">And why we chose it</span></div><div class="stays">' +
-        h.stays.map(function (s) {
-          return '<article class="stay">' + pic({ image: s.image, wiki: s.wiki, credit: s.credit, name: s.name, type: "hotel", label: s.city, area: s.areaPhoto, decorative: true }) +
+    var stays = (h.stays || []).length ? h.stays : past ? pastStays(h, visits) : [];
+    if (stays.length) {
+      html += '<section><div class="section-head"><h2>' + (past ? "Where we stayed" : "Where we stay") + '</h2><span class="eyebrow">' + (past ? "Night by night" : "And why we chose it") + '</span></div><div class="stays">' +
+        stays.map(function (s) {
+          return '<article class="stay">' + pic({ image: s.image, vk: s.vk, wiki: s.wiki, credit: s.credit, name: s.name, type: "hotel", label: s.city, area: s.areaPhoto, decorative: true }) +
             '<div class="body"><span class="eyebrow">' + esc(s.city) + ' · ' + esc(s.nights) + '</span><h3>' + esc(s.name) + '</h3>' +
-            (s.why ? '<p class="muted">' + esc(s.why) + '</p>' : "") + infoLink(s) + '<div class="card-actions">' + moreButton(s) + linkRow(s) + '</div></div></article>';
+            (s.why ? '<p class="muted">' + esc(s.why) + '</p>' : "") +
+            ((s.proof || []).length ? '<ul class="stay-proof">' + s.proof.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : "") + infoLink(s) + '<div class="card-actions">' + moreButton(s, null, s.past) + linkRow(s) + '</div></div></article>';
         }).join("") + '</div></section>';
     }
 
@@ -348,14 +350,21 @@
         '</div></div>';
       var shots = {};
       mem.forEach(function (m) { if (m.stop) shots[m.stop] = (shots[m.stop] || 0) + 1; });
-      if ((d.places || []).length) {
+      var used = [];
+      if (past && (d.places || []).length) {
+        html += '<div class="stop-list">' + d.places.map(function (p, pi) {
+          var v = visits[(i + 1) + "." + (pi + 1)], card = placeCardPast(h, d, p, i, pi, v);
+          if (v) used = used.concat(v.mems);
+          var tonight = d.sleep && p.name.toLowerCase().indexOf(d.sleep.split(",")[0].toLowerCase()) === 0;
+          return '<div class="stop-block' + (tonight || p.type === "hotel" ? " is-hotel" : "") + '">' + card +
+            (v && v.mems.length ? memoryGrid(v.mems.slice(), true) : '<p class="muted stop-none">No photos at this stop.</p>') + '</div>';
+        }).join("") + '</div>';
+        var left = mem.filter(function (m) { return used.indexOf(m) < 0; });
+        if (left.length) html += '<div class="stop-left"><h4><span aria-hidden="true">📷</span> Other photos this day <span class="muted">' + left.length + '</span></h4>' + memoryGrid(left, true) + '</div>';
+        mem = [];
+      } else if ((d.places || []).length) {
         html += '<div class="places">' + d.places.map(function (p, pi) {
           var vk = (i + 1) + "." + (pi + 1), v = past && visits[vk], own = v && v.pic;
-          if (past) return '<div class="place">' + pic({ image: own ? own.thumb || own.image : p.image, wiki: own ? "" : p.wiki, name: p.name, type: p.type, decorative: true }) +
-            '<div class="body"><div class="top"><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
-            (v && v.first ? '<span class="time">' + esc(v.first + (v.last && v.last !== v.first ? " to " + v.last : "")) + '</span>' : "") + (v ? '<span class="time">📷 ' + v.mems.length + '</span>' : "") + '</div>' +
-            '<h4>' + esc(p.name) + '</h4>' + (p.info && p.info.lead ? '<p class="note">' + esc(p.info.lead) + '</p>' : "") +
-            '<div class="card-actions">' + moreButton(p, d.city, { visit: visitText(d, v), pic: own, photos: own ? '<button class="more-btn spots place-photos" type="button" data-h="' + esc(h.id) + '" data-k="' + vk + '"><span aria-hidden="true">◎</span>Our photos here</button>' : "" }) + linkRow(p) + '</div></div></div>';
           return '<div class="place">' + pic({ image: p.image, wiki: p.wiki, credit: p.credit, name: p.name, type: p.type, area: p.areaPhoto, decorative: true }) +
             '<div class="body"><div class="top"><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
             (p.time ? '<span class="time">' + esc(p.time) + '</span>' : "") + (shots[p.name] ? '<span class="time">📷 ' + shots[p.name] + '</span>' : "") + '</div>' +
@@ -385,6 +394,15 @@
         '<p>After the trip, open <a href="#rebuild">Add your photos</a>, choose "Add to: ' + esc(h.title) + '" and pick your photos. Each photo goes under the day it was taken, next to the nearest stop.</p></div></section>';
     }
     return frame(h.id, html);
+  }
+  // A stop card on a past trip: our own photo, the times we were there, and the information.
+  function placeCardPast(h, d, p, i, pi, v) {
+    var vk = (i + 1) + "." + (pi + 1), own = v && v.pic;
+    return '<div class="place">' + pic({ image: own ? own.thumb || own.image : p.image, vk: own && !own.thumb && !own.image ? h.id + ":" + own.k : "", wiki: own ? "" : p.wiki, name: p.name, type: p.type, decorative: true }) +
+            '<div class="body"><div class="top"><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
+            (v && v.first ? '<span class="time">' + esc(v.first + (v.last && v.last !== v.first ? " to " + v.last : "")) + '</span>' : "") + (v ? '<span class="time">📷 ' + v.mems.length + '</span>' : "") + '</div>' +
+            '<h4>' + esc(p.name) + '</h4>' + (p.info && p.info.lead ? '<p class="note">' + esc(p.info.lead) + '</p>' : "") +
+            '<div class="card-actions">' + moreButton(p, d.city, { visit: visitText(d, v), pic: own, photos: own ? '<button class="more-btn spots place-photos" type="button" data-h="' + esc(h.id) + '" data-k="' + vk + '"><span aria-hidden="true">◎</span>Our photos here</button>' : "" }) + linkRow(p) + '</div></div></div>';
   }
   // Each ride as "how: time, how often, cost", with the part before the first colon in bold.
   function journeyList(list, title) {
@@ -428,7 +446,8 @@
   // page never parses megabytes of image text. Tapping a photo opens the photo viewer.
   var memReg = [], gridReg = [], gridSeen = null;
   function pageSize() { return window.matchMedia && matchMedia("(max-width: 600px)").matches ? 12 : 24; }
-  function memoryGrid(list) {
+  function memoryGrid(list, flat) {
+    if (flat) list.flat = true;
     var k = gridReg.push(list) - 1;
     return '<div class="mem-lazy" data-grid="' + k + '" style="min-height:' + Math.min(2400, 120 + Math.ceil(list.length / 4) * 180) + 'px"></div>';
   }
@@ -459,7 +478,7 @@
       return '<div class="memories">' + first.map(fig).join("") + '</div>' +
         (more > 0 ? '<button type="button" class="btn small mem-more" data-rest="' + j + '">Show all ' + items.length + ' photos' + (k ? ' from ' + esc(k) : '') + '</button>' : "");
     };
-    if (order.length < 2 && !list.some(function (m) { return m.stop; })) return block(list, "");
+    if (list.flat || (order.length < 2 && !list.some(function (m) { return m.stop; }))) return block(list, "");
     return order.map(function (k) {
       return '<div class="mem-group"><h4><span aria-hidden="true">📷</span> ' + esc(k || "Other photos") + ' <span class="muted">' + by[k].length + '</span></h4>' + block(by[k], k) + '</div>';
     }).join("");
@@ -478,6 +497,8 @@
   }
   function drawGrid(el) {
     var list = gridReg[+el.getAttribute("data-grid")]; if (!list) return;
+    var need = v2Need(list, "thumbs");
+    if (need) { el.removeAttribute("data-grid"); el.innerHTML = '<p class="tag mem-wait">Loading photos…</p>'; need.then(function () { el.setAttribute("data-grid", gridReg.indexOf(list)); drawGrid(el); }); return; }
     el.removeAttribute("data-grid"); el.style.minHeight = ""; el.classList.add("drawn");
     el.innerHTML = memoryGridNow(list); fillPics(el);
   }
@@ -489,9 +510,20 @@
       list.forEach(function (e) { if (e.isIntersecting) { gridSeen.unobserve(e.target); drawGrid(e.target); } });
     }, { rootMargin: "1500px 0px" });
     els.forEach(function (el) { gridSeen.observe(el); });
+    var vks = root.querySelectorAll("img[data-vk]");
+    if (vks.length) {
+      var want = function (img) {
+        var x = String(img.getAttribute("data-vk") || "").split(":"), h = holidays.filter(function (y) { return y.id === x[0]; })[0], m = h && byK(h)[x[1]];
+        if (m) v2Need([m], "thumbs");
+      };
+      if (!("IntersectionObserver" in window)) vks.forEach(want);
+      else { var io = new IntersectionObserver(function (list) { list.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); want(e.target); } }); }, { rootMargin: "800px 0px" }); vks.forEach(function (img) { io.observe(img); }); }
+    }
   }
   function showMore(btn) {
     var rest = gridReg[+btn.getAttribute("data-rest")] || [], grid = btn.previousElementSibling;
+    var need = v2Need(rest.slice(0, 60), "thumbs");
+    if (need) { btn.disabled = true; need.then(function () { btn.disabled = false; showMore(btn); }); return; }
     var next = rest.splice(0, 60), tmp = document.createElement("div");
     tmp.innerHTML = memoryGridNow(next);
     var add = tmp.querySelector(".memories");
@@ -536,9 +568,11 @@
   var lbList = [], lbAt = 0;
   function showPhoto() {
     var d = viewer(), m = lbList[lbAt]; if (!m) return;
-    var img = d.querySelector(".lb-img"), src = m.image || m.thumb;
+    if (!m.image && m.fp) { var w = v2Need([m], "full"); if (w) w.then(function () { if (lbList[lbAt] === m) showPhoto(); }); }
+    var img = d.querySelector(".lb-img"), src = m.image || m.thumb || "";
     img.alt = m.caption || m.place || "Photo";
     if (m.thumb && m.thumb !== src) img.src = m.thumb;
+    if (!src) return;
     var full = new Image(); full.src = src;
     (full.decode ? full.decode() : Promise.resolve()).then(function () { if (lbList[lbAt] === m) img.src = src; }, function () { if (lbList[lbAt] === m) img.src = src; });
     d.querySelector(".lb-cap").textContent = (m.caption || m.place || "") + (m.time ? " · " + m.time : "") + " · Photo " + (lbAt + 1) + " of " + lbList.length;
@@ -1360,7 +1394,7 @@
   function partBytes(mems) { return Math.round(mems.reduce(function (n, m) { return n + (m.image || "").length + (m.thumb || "").length + (m.clip || "").length + 300; }, 2000) * 1.37); }
   // The list of holiday files with this trip's files in place, keeping the other trips and their order (newest first).
   function listJs(plan) {
-    var out = (window.HOLIDAY_FILES || []).filter(function (n) { return n !== plan.names[0] && n.indexOf(plan.id + ".photos-") !== 0; }), at = out.length;
+    var out = (window.HOLIDAY_FILES || []).filter(function (n) { return n !== plan.names[0] && !partName(plan.id, n); }), at = out.length;
     for (var k = 0; k < out.length; k++) {
       var h = holidays.filter(function (x) { return x.id + ".js" === out[k]; })[0];
       if (h && h.start < plan.hol.start) { at = k; break; }
@@ -1381,6 +1415,15 @@
   function saveGuard(msg) {
     if (rb.mode === "add" && rb.target && (partsFailed[rb.target] || []).length) {
       msg.textContent = "A photos file didn't load (" + partsFailed[rb.target].join(", ") + "). Saving now would leave out the photos in that file, so we stopped. Reload the page and try again.";
+      return false;
+    }
+    var T2 = rb.mode === "add" && rbTarget();
+    if (T2 && T2.v2 && !v2Ready(T2)) {
+      msg.textContent = "Loading all of this trip's photos first, so none are lost…";
+      loadAllV2(T2, function (n, all) { msg.textContent = "Loading this trip's photos (" + n + " of " + all + ")…"; }).then(function (ok) {
+        msg.textContent = ok ? "Ready. Press Save again." : "Some photo files didn't load. Reload the page and try again.";
+        if (ok) refreshFile();
+      });
       return false;
     }
     if (rb.mode === "add" && rb.target && (laterFor(rb.target).length || partsBusy[rb.target])) {
@@ -1663,20 +1706,13 @@
         route: route, days: days, memories: memories
       };
     }
-    // Big holidays are split into parts of about 30 MB of photos (about 40 MB once locked), well under GitHub's 100 MB limit.
-    var parts = [[]], size = 0, LIMIT = 30 * 1048576;
-    hol.memories.forEach(function (m) {
-      var n = (m.image || "").length + (m.clip || "").length + (m.thumb || "").length;
-      if (size + n > LIMIT && parts[parts.length - 1].length) { parts.push([]); size = 0; }
-      parts[parts.length - 1].push(m); size += n;
-    });
-    var names = parts.map(function (x, i) { return i ? id + ".photos-" + (i + 1) + ".js" : id + ".js"; });
-    rb.plan = { hol: hol, parts: parts, names: names, id: id };
+    var plan = planV2(hol, id), names = plan.names;
+    rb.plan = plan;
     rb.built = null; rb.saved = {};
     var sum = document.getElementById("rb-sum");
     if (!sum) return;
-    var sizes = {}, total = 0;
-    parts.forEach(function (x, i) { sizes[names[i]] = partBytes(x); total += sizes[names[i]]; });
+    var sizes = plan.sizes, total = 0;
+    names.forEach(function (n) { total += sizes[n]; });
     var newMems = memories.length, vids = memories.filter(function (m) { return m.kind === "video"; }), clips = rb.photos.filter(function (p) { return kept(p) && p.video && p.fav; }).length;
     var skipped = rb.photos.filter(function (p) { return kept(p) && !p.data; }).length, aside = rb.photos.length - rb.photos.filter(kept).length;
     var pct = Math.min(100, Math.round(total / 1073741824 * 100));
@@ -1720,18 +1756,18 @@
     if (!plan) return Promise.reject();
     if (rb.built && rb.built.plan === plan) return Promise.resolve(rb.built.files);
     var files = [], stamp = today();
-    return plan.parts.reduce(function (chain, mems, i) {
+    var n = plan.bodies.length;
+    return plan.bodies.reduce(function (chain, body, i) {
       return chain.then(function () {
-        if (msg) msg.textContent = "Locking " + (plan.parts.length > 1 ? "file " + (i + 1) + " of " + plan.parts.length : "the holiday file") + "…";
-        var bar = document.getElementById("rb-save-bar");
-        if (bar) { var pc = Math.round(i / plan.parts.length * 100); bar.hidden = false; bar.setAttribute("aria-valuenow", pc); bar.firstChild.style.width = pc + "%"; }
-        var body = i ? { partOf: plan.id, part: i + 1, memories: mems } : Object.assign({}, plan.hol, { memories: mems, photoParts: plan.parts.length });
+        if (msg) msg.textContent = "Locking " + (n > 1 ? "file " + (i + 1) + " of " + n : "the holiday file") + "…";
+        var bar = document.getElementById("rb-save-bar") || document.getElementById("v2-bar");
+        if (bar) { var pc = Math.round(i / n * 100); bar.hidden = false; bar.setAttribute("aria-valuenow", pc); bar.firstChild.style.width = pc + "%"; }
         return lockHoliday(body, unlockedKey).then(function (box) {
-          files.push({ name: plan.names[i], text: "/* " + plan.hol.title + (i ? ", photos part " + (i + 1) : "") + ". Holiday file made by Rebuild from photos on " + stamp + ". Locked with the album passkey. Save as holidays/" + plan.names[i] + " */\nHolidayAlbum.addLocked(" + JSON.stringify(box) + ");\n" });
+          files.push({ name: plan.names[i], text: "/* " + plan.hol.title + (i ? ", " + (body.kind === "thumbs" ? "small photos" : "full photos") + " part " + body.part : "") + ". Holiday file made on " + stamp + ". Locked with the album passkey. Save as holidays/" + plan.names[i] + " */\nHolidayAlbum.addLocked(" + JSON.stringify(box) + ");\n" });
         });
       });
     }, Promise.resolve()).then(function () {
-      var bar = document.getElementById("rb-save-bar");
+      var bar = document.getElementById("rb-save-bar") || document.getElementById("v2-bar");
       if (bar) { bar.setAttribute("aria-valuenow", 100); bar.firstChild.style.width = "100%"; }
       rb.built = { plan: plan, files: files }; return files;
     });
@@ -1835,6 +1871,8 @@
         if (mm) showMore(mm);
         var ib = e.target.closest && e.target.closest(".info-copy, .info-check, .info-save, .info-list");
         if (ib) infoClick(ib);
+        var qg = e.target.closest && e.target.closest(".quick-go");
+        if (qg && !qg.disabled) quickGo(qg);
         var sp = e.target.closest && e.target.closest(".place-photos");
         if (sp) openStopPhotos(sp);
       });
@@ -1870,11 +1908,46 @@
         v.mems.push(m); m.label = d.places[best].name;
         if (m.time && (!v.first || m.time < v.first)) v.first = m.time;
         if (m.time && m.time > v.last) v.last = m.time;
-        if (!v.pic && m.kind !== "video" && (m.thumb || m.image)) v.pic = m;
+        if (!v.pic && m.kind !== "video" && (m.thumb || m.image || m.tp)) v.pic = m;
       });
     });
     h._visits = { n: h.memories.length, map: map };
     return map;
+  }
+  // Each night's hotel, from the days' "sleep", joined when we stayed more than one night.
+  function pastStays(h, vs) {
+    var out = [];
+    (h.days || []).forEach(function (d, di) {
+      if (!d.sleep || /plane/i.test(d.sleep)) return;
+      var last = out[out.length - 1];
+      if (last && last.name === d.sleep && last.lastDay === di - 1) { last.n++; last.lastDay = di; last.to = d.date; return; }
+      out.push({ name: d.sleep, city: d.city || "", n: 1, from: d.date, to: d.date, lastDay: di, firstDay: di });
+    });
+    // For each night: the day's last photo and the next morning's first photo, and how far each was from the hotel.
+    var timed = function (di) { var d = (h.days || [])[di]; return d ? h.memories.filter(function (m) { return m.date === d.date && m.time && m.lat != null; }).sort(function (a, b) { return a.time < b.time ? -1 : 1; }) : []; };
+    var far = function (m, p) { var km = distKm(p.lat, p.lon, m.lat, m.lon); return km < 1 ? "at the hotel" : km < 10 ? km.toFixed(1) + " km away" : Math.round(km) + " km away"; };
+    return out.map(function (s) {
+      var key = s.name.split(",")[0].toLowerCase(), own = null, k = null, vk = "", count = 0;
+      (h.days || []).forEach(function (d, di) { (d.places || []).forEach(function (p, pi) {
+        var v = vs[(di + 1) + "." + (pi + 1)];
+        if (!v || p.name.toLowerCase().indexOf(key) !== 0) return;
+        count += v.mems.length;
+        if (!own && v.pic) { own = v.pic; k = v.pic.k; vk = (di + 1) + "." + (pi + 1); }
+      }); });
+      var spot = null;
+      (h.days || []).forEach(function (d) { (d.places || []).forEach(function (p) { if (!spot && p.lat != null && p.name.toLowerCase().indexOf(key) === 0) spot = p; }); });
+      var proof = [];
+      for (var di = s.firstDay; di <= s.lastDay; di++) {
+        var eve = timed(di).pop(), morn = timed(di + 1)[0], bits = [];
+        if (spot && eve) bits.push("last photo " + eve.time + ", " + far(eve, spot));
+        if (spot && morn) bits.push("first photo next morning " + morn.time + ", " + far(morn, spot));
+        if (bits.length) proof.push(niceShort(h.days[di].date) + ": " + bits.join("; ") + ".");
+      }
+      return { name: s.name, city: s.city, type: "hotel", nights: niceShort(s.from) + (s.n > 1 ? " to " + niceShort(s.to) : "") + " · " + s.n + (s.n === 1 ? " night" : " nights"),
+        why: count ? count + (count === 1 ? " photo" : " photos") + " taken here." : "No photos taken at the hotel itself.", proof: proof,
+        image: own ? own.thumb || own.image : "", vk: own && !own.thumb && !own.image && k != null ? h.id + ":" + k : "", mapQuery: s.name,
+        past: own ? { photos: '<button class="more-btn spots place-photos" type="button" data-h="' + esc(h.id) + '" data-k="' + vk + '"><span aria-hidden="true">◎</span>Our photos here</button>' } : null };
+    });
   }
   function visitText(d, v) {
     if (!v) return "";
@@ -2015,6 +2088,178 @@
     if (m) openPhotoMem(m, b);
   }
 
+  // ---------- small and full photo files ----------
+  // A trip saves its photos twice: small previews (<id>.thumbs-N.js, about 4 MB each) and full photos
+  // (<id>.full-N.js, about 8 MB each). The main file keeps only where each photo belongs, so opening a trip
+  // downloads the previews a day at a time, and a full photo only when it is opened.
+  var v2Parts = [], v2Done = {}, v2Chain = Promise.resolve(), v2Wait = {};
+  function partName(id, n) { return n.indexOf(id + ".") === 0 && /\.(photos|thumbs|full)-\d+\.js$/.test(n.slice(id.length)); }
+  function planV2(hol, id) {
+    var TH = 4 * 1048576, FU = 8 * 1048576, thumbs = [], full = [], ts = TH, fs = FU, sizes = {};
+    var put = function (list, cap, used, key, val) {
+      if (used + val.length > cap || !list.length) { list.push({}); used = 0; }
+      list[list.length - 1][key] = val; return used + val.length;
+    };
+    var index = hol.memories.map(function (m, k) {
+      var e = {};
+      Object.keys(m).forEach(function (x) { if (!/^(image|thumb|clip|label|k|tp|fp|hasClip)$/.test(x) && x[0] !== "_") e[x] = m[x]; });
+      e.k = k;
+      var t = m.thumb || (m.kind === "video" ? m.image : "") || "";
+      if (t || m.clip) {
+        if (t) { ts = put(thumbs, TH, ts, k, t); e.tp = thumbs.length; }
+        if (m.clip) { ts = put(thumbs, TH, ts, "c" + k, m.clip); e.tp = thumbs.length; e.hasClip = 1; }
+      }
+      if (m.image && m.kind !== "video") { fs = put(full, FU, fs, k, m.image); e.fp = full.length; }
+      return e;
+    });
+    var main = Object.assign({}, hol, { memories: index, v2: { thumbs: thumbs.length, full: full.length } });
+    delete main.photoParts; delete main._visits; delete main._info; delete main._byK;
+    var names = [id + ".js"], bodies = [main];
+    thumbs.forEach(function (items, i) { names.push(id + ".thumbs-" + (i + 1) + ".js"); bodies.push({ partOf: id, kind: "thumbs", part: i + 1, items: items }); });
+    full.forEach(function (items, i) { names.push(id + ".full-" + (i + 1) + ".js"); bodies.push({ partOf: id, kind: "full", part: i + 1, items: items }); });
+    var len = function (o) { return Object.keys(o).reduce(function (n, k) { return n + String(o[k]).length + 12; }, 0); };
+    sizes[names[0]] = Math.round((JSON.stringify(index).length + (hol.cover && hol.cover.image ? hol.cover.image.length : 0) + 4000) * 1.37);
+    bodies.forEach(function (b, i) { if (i) sizes[names[i]] = Math.round(len(b.items) * 1.37); });
+    return { hol: hol, id: id, names: names, bodies: bodies, sizes: sizes };
+  }
+  function byK(h) {
+    if (!h._byK) { h._byK = {}; h.memories.forEach(function (m) { if (m.k != null) h._byK[m.k] = m; }); }
+    return h._byK;
+  }
+  function applyV2() {
+    v2Parts.splice(0).forEach(function (part) {
+      var h = holidays.filter(function (x) { return x.id === part.partOf; })[0];
+      if (!h) return;
+      var map = byK(h);
+      Object.keys(part.items || {}).forEach(function (key) {
+        var clip = key[0] === "c", m = map[clip ? key.slice(1) : key], val = part.items[key];
+        if (!m) return;
+        if (clip) m.clip = val;
+        else if (part.kind === "thumbs") { if (m.kind === "video") m.image = val; else m.thumb = val; }
+        else m.image = val;
+      });
+      v2Done[part.partOf + "." + part.kind + "-" + part.part + ".js"] = true;
+      document.querySelectorAll('img[data-vk^="' + part.partOf + ':"]').forEach(function (img) {
+        var m = map[img.getAttribute("data-vk").split(":")[1]];
+        if (m && (m.thumb || m.image)) { img.src = m.thumb || m.image; img.removeAttribute("data-vk"); }
+      });
+    });
+  }
+  // One file at a time, so each file's photos are in place before the next starts.
+  function loadV2(name) {
+    if (v2Done[name]) return Promise.resolve(true);
+    if (v2Wait[name]) return v2Wait[name];
+    window.HOLIDAY_LATER = (window.HOLIDAY_LATER || []).filter(function (x) { return x !== name; });
+    return (v2Wait[name] = v2Chain = v2Chain.then(function () {
+      return loadScript(name).then(function (ok) {
+        if (!ok) { delete v2Wait[name]; return false; }
+        var boxes = locked.splice(0);
+        return Promise.all(boxes.map(function (box) { return openBox(box, unlockedKey).then(HolidayAlbum.add, function () { }); }))
+          .then(function () { applyV2(); v2Done[name] = true; return true; });
+      });
+    }));
+  }
+  // The files a list of photos still needs, loaded; or null when nothing is missing.
+  function v2Need(list, kind) {
+    var want = {};
+    list.forEach(function (m) {
+      var h = m._h; if (!h) return;
+      if (kind === "thumbs" && m.tp && !(m.kind === "video" ? m.image && (!m.hasClip || m.clip) : m.thumb)) want[h + ".thumbs-" + m.tp + ".js"] = 1;
+      if (kind === "full" && m.fp && !m.image) want[h + ".full-" + m.fp + ".js"] = 1;
+    });
+    var names = Object.keys(want).filter(function (n) { return !v2Done[n]; });
+    return names.length ? Promise.all(names.map(loadV2)) : null;
+  }
+  function v2Ready(h) {
+    if (!h || !h.v2) return true;
+    for (var i = 1; i <= h.v2.thumbs; i++) if (!v2Done[h.id + ".thumbs-" + i + ".js"]) return false;
+    for (var j = 1; j <= h.v2.full; j++) if (!v2Done[h.id + ".full-" + j + ".js"]) return false;
+    return true;
+  }
+  function loadAllV2(h, onStep) {
+    var names = [], n = 0;
+    for (var i = 1; i <= h.v2.thumbs; i++) names.push(h.id + ".thumbs-" + i + ".js");
+    for (var j = 1; j <= h.v2.full; j++) names.push(h.id + ".full-" + j + ".js");
+    return Promise.all(names.map(function (x) { return loadV2(x).then(function (ok) { n++; if (onStep) onStep(n, names.length); return ok; }); }))
+      .then(function (oks) { return oks.every(Boolean); });
+  }
+  function tagV2() { holidays.forEach(function (h) { if (h.v2) h.memories.forEach(function (m) { m._h = h.id; }); }); }
+
+  // "Make this trip quicker to open": an older trip (one big photo per memory) is saved again as previews and full photos.
+  function quickBox(h) {
+    if (h.v2 || !(h.memories || []).some(function (m) { return m.image; })) return "";
+    return '<div class="tipbox quick-box" data-h="' + esc(h.id) + '"><h4><span aria-hidden="true">⚡</span> Make this trip quicker to open</h4>' +
+      '<p>Right now a phone downloads every full-size photo of this trip before showing it. Saving it again in the new way splits each photo into a small preview and the full photo, so the trip opens fast and a full photo downloads only when it is tapped.</p>' +
+      '<div class="row"><button class="btn primary quick-go" type="button">Make it quicker</button>' + (window.showDirectoryPicker ? '<span class="tag">You choose the website\'s holidays folder, and the new files are saved straight into it.</span>' : '<span class="tag">The new files download one by one.</span>') + '</div>' +
+      '<div class="bar-track" id="v2-bar" role="progressbar" aria-label="Making the new files" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span></span></div>' +
+      '<p class="tag quick-msg" role="status" aria-live="polite"></p></div>';
+  }
+  function smallCopy(src) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () {
+        var sc = Math.min(1, 320 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.naturalWidth * sc)); c.height = Math.max(1, Math.round(img.naturalHeight * sc));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        var out = c.toDataURL("image/jpeg", 0.6); c.width = c.height = 0; resolve(out);
+      };
+      img.onerror = function () { resolve(""); };
+      img.src = src;
+    });
+  }
+  function quickGo(b) {
+    var box = b.closest(".quick-box"), h = holidays.filter(function (x) { return x.id === box.dataset.h; })[0], msg = box.querySelector(".quick-msg");
+    if (!h) return;
+    var bar = box.querySelector("#v2-bar"), setBar = function (pc) { bar.hidden = false; bar.setAttribute("aria-valuenow", pc); bar.firstChild.style.width = pc + "%"; };
+    var pick = window.showDirectoryPicker ? window.showDirectoryPicker({ mode: "readwrite", id: "holidays" }) : Promise.resolve(null);
+    b.disabled = true;
+    pick.then(function (dir) {
+      msg.textContent = "Loading all of this trip's photos…";
+      return (laterFor(h.id).length || partsBusy[h.id] ? loadParts(h.id) : Promise.resolve()).then(function () {
+        mergeParts();
+        if ((partsFailed[h.id] || []).length) throw new Error("A photos file didn't load (" + partsFailed[h.id].join(", ") + "). Reload the page and try again.");
+        var todo = h.memories.filter(function (m) { return m.image && !m.thumb && m.kind !== "video"; }), done = 0;
+        return todo.reduce(function (chain, m) {
+          return chain.then(function () {
+            return smallCopy(m.image).then(function (t) {
+              if (t) m.thumb = t; done++;
+              if (done % 20 === 0 || done === todo.length) { msg.textContent = "Making small previews: " + done + " of " + todo.length + "…"; setBar(Math.round(done / todo.length * 50)); }
+            });
+          });
+        }, Promise.resolve()).then(function () {
+          var before = h.memories.length, photos = h.memories.filter(function (m) { return m.image; }).length;
+          var copy = Object.assign({}, h, { memories: h.memories.slice() });
+          var plan = planV2(copy, h.id), placed = 0;
+          plan.bodies.forEach(function (bd) { if (bd.kind === "full") placed += Object.keys(bd.items).length; });
+          if (plan.bodies[0].memories.length !== before || placed !== h.memories.filter(function (m) { return m.image && m.kind !== "video"; }).length) throw new Error("The new files didn't hold every photo, so nothing was saved.");
+          rb.plan = plan; rb.built = null;
+          return lockFiles(msg).then(function (files) {
+            var byName = {}; files.forEach(function (f) { byName[f.name] = f; });
+            var order = uploadOrder(plan.names).map(function (n) { return byName[n]; });
+            var list = { name: "list.js", text: listJs(plan) };
+            var old = (window.HOLIDAY_FILES || []).filter(function (n) { return partName(h.id, n) && plan.names.indexOf(n) < 0; });
+            var end = function (where) {
+              msg.textContent = "Done: " + photos + " photos in " + order.length + " new files" + where + "." + (old.length ? " Next, delete the old files " + old.join(", ") + " from the holidays folder." : "") + " Then upload the folder, or ask Claude to do it.";
+              say("Done.");
+            };
+            if (dir) {
+              return order.concat([list]).reduce(function (chain, f, i) {
+                return chain.then(function () {
+                  msg.textContent = "Saving file " + (i + 1) + " of " + (order.length + 1) + " into " + dir.name + "…";
+                  return dir.getFileHandle(f.name, { create: true }).then(function (fh) { return fh.createWritable(); }).then(function (w) { return w.write(f.text).then(function () { return w.close(); }); });
+                });
+              }, Promise.resolve()).then(function () { end(" (and list.js) in the folder " + dir.name); });
+            }
+            order.concat([list]).forEach(function (f, i) { setTimeout(function () { giveFile(f.name, f.text); if (i === order.length) end(" (and list.js) in your Downloads folder"); }, i * 1500); });
+          });
+        });
+      });
+    }).catch(function (e) {
+      b.disabled = false;
+      msg.textContent = e && e.name === "AbortError" ? "No folder chosen, so nothing was saved." : e && e.message && !/^Failed|lock/i.test(e.message) ? e.message : "This browser could not make the files. Open the album from the website (https) on a computer and try again.";
+    });
+  }
+
   // ---------- start ----------
   // Photo part files (holiday.photos-2.js and on) join their holiday; a repeated photo is kept once.
   var photoParts = [];
@@ -2079,7 +2324,7 @@
         if (now === "rebuild" ? !rb.photos.length : now.replace(/-day\d+$/, "") === hid) keepPlace(render);
       });
     });
-    mergeParts(); mergeInfo();
+    mergeParts(); applyV2(); tagV2(); mergeInfo();
     var root = document.getElementById("app");
     var h = holidays.filter(function (x) { return x.id === id; })[0];
     moreList = [];
@@ -2103,6 +2348,7 @@
 
   window.HolidayAlbum = {
     add: function (h) {
+      if (h.partOf && h.kind) { v2Parts.push(h); return; }
       if (h.partOf) { photoParts.push(h); return; }
       if (h.infoFor) { infoPacks.push(h); return; }
       h.cover = h.cover || {}; h.memories = h.memories || []; holidays.push(h);

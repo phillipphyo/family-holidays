@@ -2,8 +2,8 @@
 // Extra photo files (name.photos-2.js and on) are big, so they wait until that holiday is opened.
 (function () {
   var files = (window.HOLIDAY_FILES || []).filter(function (name) { return /^[\w.-]+\.js$/.test(name); });
-  window.HOLIDAY_LATER = files.filter(function (name) { return /\.photos-\d+\.js$/.test(name); });
-  files = files.filter(function (name) { return !/\.photos-\d+\.js$/.test(name); });
+  window.HOLIDAY_LATER = files.filter(function (name) { return /\.(photos|thumbs|full)-\d+\.js$/.test(name); });
+  files = files.filter(function (name) { return !/\.(photos|thumbs|full)-\d+\.js$/.test(name); });
   var left = files.length;
   if (!left) return HolidayAlbum.start();
   files.forEach(function (name) {
