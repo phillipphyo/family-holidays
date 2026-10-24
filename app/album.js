@@ -210,7 +210,7 @@
     var lead = function (label, text) { return text ? '<div class="more-row first">' + (label ? '<h3 class="more-label">' + label + '</h3>' : "") + '<p class="more-lead" id="more-lead">' + esc(text) + '</p></div>' : ""; };
     var body = spots
       ? lead("Where to stand", m.spots) + row("Poses to try", m.poses) + row("Camera angle", m.angles) + row("Best light", m.light) + row("Beat the crowds", m.crowds)
-      : info ? lead("", m.lead) + row("What it is", m.what) + row("When we were there", entry.past.visit) + row("Best time to go", m.best) + row("Good to know", m.tips) + row("If we go again", m.again)
+      : info ? lead("", m.lead) + row("What it is", m.what) + row("When we were there", entry.past.visit) + row("Best time to go", m.best) + row("Good to know", m.tips) + row("If we go again", m.again) + row("Places we saved here", (m.pins || []).join(" · "))
       : lead("", m.why) + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + row("Skip it if", m.skip, "skip");
     var foot = spots
       ? '<div class="links seg"><a class="btn" href="' + u("https://www.google.com/search?tbm=isch&q=" + q(p.name + " best photo spot")) + '" target="_blank" rel="noopener noreferrer">More example photos</a>' +
@@ -451,7 +451,7 @@
         '<figcaption>' + esc(m.caption || m.place || "") + (m.place && m.caption ? " · " + esc(m.place) : "") + '</figcaption></figure>';
     };
     var order = [], by = {};
-    list.forEach(function (m) { var k = m.stop || m.place || ""; if (!by[k]) { by[k] = []; order.push(k); } by[k].push(m); });
+    list.forEach(function (m) { var k = m.label || m.stop || m.place || ""; if (!by[k]) { by[k] = []; order.push(k); } by[k].push(m); });
     var page = pageSize();
     var block = function (items, k) {
       var first = items.slice(0, page), more = items.length - first.length;
@@ -1847,7 +1847,7 @@
   // A past trip has no plan, so each stop's facts come from our photos (when we were there, how we likely got there)
   // and from an information file Claude writes, locked like the photos (holidays/<id>.info.js).
   var infoPacks = [], infoDraft = null;
-  var INFO_FIELDS = ["lead", "what", "best", "tips", "again", "wiki"];
+  var INFO_FIELDS = ["name", "lead", "what", "best", "tips", "again", "wiki"];
   function isPastTrip(h) {
     return (h.memories || []).length > 0 && !(h.days || []).some(function (d) { return (d.places || []).some(function (p) { return p.more; }); });
   }
@@ -1860,14 +1860,14 @@
       mems.forEach(function (m) {
         var best = -1, bd = 1e9;
         (d.places || []).forEach(function (p, pi) {
-          var named = m.place && (p.name === m.place || p.name.indexOf(m.place + ", stop ") === 0);
+          var pn = p._orig || p.name, named = m.place && (pn === m.place || pn.indexOf(m.place + ", stop ") === 0);
           var km = p.lat != null && m.lat != null ? distKm(p.lat, p.lon, m.lat, m.lon) : named ? 0 : 1e6;
           var score = named ? km : km + 1000;
           if (score < bd && (named || km < 2)) { bd = score; best = pi; }
         });
         if (best < 0) return;
         var k = (di + 1) + "." + (best + 1), v = map[k] = map[k] || { mems: [], first: "", last: "" };
-        v.mems.push(m);
+        v.mems.push(m); m.label = d.places[best].name;
         if (m.time && (!v.first || m.time < v.first)) v.first = m.time;
         if (m.time && m.time > v.last) v.last = m.time;
         if (!v.pic && m.kind !== "video" && (m.thumb || m.image)) v.pic = m;
@@ -1901,7 +1901,8 @@
   function cleanInfo(x) {
     var o = {};
     if (!x || typeof x !== "object") return null;
-    INFO_FIELDS.forEach(function (f) { if (x[f] != null && String(x[f]).trim()) o[f] = String(x[f]).trim().slice(0, f === "wiki" ? 120 : 700); });
+    INFO_FIELDS.forEach(function (f) { if (x[f] != null && String(x[f]).trim()) o[f] = String(x[f]).trim().slice(0, f === "wiki" || f === "name" ? 120 : 700); });
+    if (Array.isArray(x.pins)) { var pins = x.pins.slice(0, 8).map(function (t) { return String(t).trim().slice(0, 80); }).filter(Boolean); if (pins.length) o.pins = pins; }
     if (TYPE_LABEL[x.type]) o.type = x.type;
     return Object.keys(o).length ? o : null;
   }
@@ -1914,13 +1915,15 @@
       if (!p) return;
       if (info.type) { p.type = info.type; delete info.type; }
       if (info.wiki && !p.wiki) p.wiki = info.wiki;
+      if (info.name) { p._orig = p._orig || p.name; p.name = info.name; }
       p.info = info; n++;
     });
     Object.keys(pack.days || {}).forEach(function (k) {
-      var d = (h.days || [])[+k - 1], t = pack.days[k] && pack.days[k].title;
+      var d = (h.days || [])[+k - 1], t = pack.days[k] && pack.days[k].title, z = pack.days[k] && pack.days[k].sleep;
       if (d && t) d.title = String(t).trim().slice(0, 120);
+      if (d && z) d.sleep = String(z).trim().slice(0, 120);
     });
-    h._info = pack;
+    h._info = pack; h._visits = null;
     return n;
   }
   function mergeInfo() {
@@ -1971,7 +1974,11 @@
       if (!pack || typeof pack.places !== "object") { msg.textContent = "The reply has no places in it. Ask Claude again with the stop list."; return; }
       var clean = { infoFor: h.id, made: today(), places: {}, days: {} };
       Object.keys(pack.places).forEach(function (k) { var c = cleanInfo(pack.places[k]); if (c && /^\d+\.\d+$/.test(k)) { if (TYPE_LABEL[pack.places[k].type]) c.type = pack.places[k].type; clean.places[k] = c; } });
-      Object.keys(pack.days || {}).forEach(function (k) { if (/^\d+$/.test(k) && pack.days[k] && pack.days[k].title) clean.days[k] = { title: String(pack.days[k].title).slice(0, 120) }; });
+      Object.keys(pack.days || {}).forEach(function (k) {
+        var dk = pack.days[k]; if (!/^\d+$/.test(k) || !dk) return;
+        var c2 = {}; if (dk.title) c2.title = String(dk.title).slice(0, 120); if (dk.sleep) c2.sleep = String(dk.sleep).slice(0, 120);
+        if (c2.title || c2.sleep) clean.days[k] = c2;
+      });
       var n = applyInfo(h, JSON.parse(JSON.stringify(clean)));
       infoDraft = clean;
       keepPlace(render);
