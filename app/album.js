@@ -2183,12 +2183,17 @@
   }
   function bookingsToDo(h) { return (h.bookings || []).filter(function (b) { return (b.todo || []).length || bookingStatus(b)[1] === "Still to book"; }).length; }
   function venueList(h, type, past) {
-    var out = "", n = 0;
+    var out = "", n = 0, types = [].concat(type);
     (h.days || []).forEach(function (d, i) {
-      var ps = (d.places || []).filter(function (p) { return p.type === type; }); if (!ps.length) return;
+      var ps = (d.places || []).filter(function (p) { return types.indexOf(p.type) >= 0; }); if (!ps.length) return;
       var dd = parseDate(d.date);
       out += '<div class="venue-day"><a class="venue-daylink" data-h="' + esc(h.id) + '" data-day="' + (i + 1) + '" href="#' + esc(h.id) + '-day' + (i + 1) + '">Day ' + (i + 1) + ' · ' + WD[dd.getDay()] + ' ' + dd.getDate() + ' ' + MON[dd.getMonth()] + (d.city ? ' · ' + esc(d.city) : "") + '</a><ul>' +
-        ps.map(function (p) { n++; return '<li><div class="venue-top"><b>' + esc(p.name) + '</b>' + (p.time ? '<span class="time">' + esc(p.time) + '</span>' : "") + '</div>' + (p.note ? '<p class="note">' + esc(p.note) + '</p>' : "") + (past ? "" : moreButton(p, d.city)) + '</li>'; }).join("") + '</ul></div>';
+        ps.map(function (p) {
+          n++;
+          var chip = /pending decision/i.test(p.name) ? '<span class="stay-status decide">Pending decision</span>' : /optional/i.test(p.name) ? '<span class="stay-status warn">Optional</span>' : "";
+          return '<li><div class="venue-top"><b>' + esc(p.name) + '</b>' + (p.time ? '<span class="time">' + esc(p.time) + '</span>' : "") + '</div>' + (chip ? '<p class="venue-chip">' + chip + '</p>' : "") + (p.note ? '<p class="note">' + esc(p.note) + '</p>' : "") +
+            '<p class="venue-pin"><a class="pin-link" href="' + esc(mapUrl(p)) + '" target="_blank" rel="noopener noreferrer">Map <span aria-hidden="true">↗</span></a></p>' + (past ? "" : moreButton(p, d.city)) + '</li>';
+        }).join("") + '</ul></div>';
     });
     return { n: n, html: out };
   }
@@ -2199,8 +2204,8 @@
       tabs.push({ k: "stays", icon: "🏨", label: past ? "Where we stayed" : "Where we stay", sub: stays.length + (stays.length === 1 ? " place" : " places") + (sb ? " · " + sb + " to book" : ""), html: staysHtml }); }
     if ((h.bookings || []).length) { var td = bookingsToDo(h);
       tabs.push({ k: "bookings", icon: "🧾", label: "Our bookings", sub: h.bookings.length + (h.bookings.length === 1 ? " item" : " items") + " · " + (td ? td + " to do" : "all done"), html: bookingsList(h) }); }
-    [["shopping", "🛍️", "Shopping"], ["food", "🍜", "Food"]].forEach(function (t) {
-      var v = venueList(h, t[0], past); if (v.n) tabs.push({ k: t[0], icon: t[1], label: t[2], sub: v.n + (v.n === 1 ? " place" : " places"), html: '<div class="venues">' + v.html + '</div>' });
+    [["sights", "⛩️", past ? "Places we visited" : "Places to visit", ["sight", "nature"]], ["shopping", "🛍️", "Shopping"], ["food", "🍜", "Food"]].forEach(function (t) {
+      var v = venueList(h, t[3] || t[0], past); if (v.n) tabs.push({ k: t[0], icon: t[1], label: t[2], sub: v.n + (v.n === 1 ? " place" : " places"), html: '<div class="venues">' + v.html + '</div>' });
     });
     if (!tabs.length) return "";
     var open = fold.glance || "";

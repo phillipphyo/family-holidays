@@ -831,3 +831,5 @@ details.keeper .tipbox, details.keeper .plan-box { margin-top: 12px; }
 .dec-links { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .dec-links a { color: var(--indigo); font-size: 14px; }
 @media (max-width: 560px) { .glance-tab[data-panel="decisions"] { grid-column: 1 / -1; } }
+.venue-chip, .venue-pin { margin: 4px 0 0; }
+.venue-pin .pin-link { font-size: 14px; color: var(--indigo); }
