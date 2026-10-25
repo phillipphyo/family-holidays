@@ -213,6 +213,21 @@
         return '<li><b>' + esc(x.name) + '</b>' + (x.note ? ' ' + esc(x.note) : "") + ' <a class="pin-link" href="' + u("https://www.google.com/maps/search/?api=1&query=" + q(x.map || x.name)) + '" target="_blank" rel="noopener noreferrer">Map <span aria-hidden="true">↗</span></a></li>';
       }).join("") + '</ul></div>';
     };
+    // Food crawl: each shop's hours, pay and prices, then a fold-out ordering card to show staff.
+    var shopRow = function (label, list) {
+      list = (list || []).filter(function (x) { return x && x.name; }); if (!list.length) return "";
+      return '<div class="more-row"><h3 class="more-label">' + label + '</h3><ul class="more-list shop-list">' + list.map(function (x) {
+        return '<li><b>' + esc(x.name) + '</b>' + [["Hours", x.hours], ["Pay", x.pay], ["Prices", x.prices], ["Good to know", x.queue]].filter(function (r) { return r[1]; }).map(function (r) { return '<span class="shop-fact"><i>' + r[0] + ':</i> ' + esc(r[1]) + '</span>'; }).join("") + '</li>';
+      }).join("") + '</ul></div>';
+    };
+    var phraseRow = function (label, groups) {
+      groups = (groups || []).filter(function (g) { return g && (g.rows || []).length; }); if (!groups.length) return "";
+      return '<div class="more-row"><h3 class="more-label">' + label + '</h3>' + groups.map(function (g) {
+        return '<details class="phrase-card"><summary>' + esc(g.title) + '</summary>' + (g.rule ? '<p class="phrase-rule">' + esc(g.rule) + '</p>' : "") + '<ul class="phrase-list">' + g.rows.map(function (r) {
+          return '<li><span class="ph-en">' + esc(r.en) + '</span><span class="ph-ja" lang="ja">' + esc(r.ja) + '</span><span class="ph-ro">' + esc(r.ro) + '</span></li>';
+        }).join("") + '</ul></details>';
+      }).join("") + '</div>';
+    };
     var row = function (label, text, cls) { return text ? '<div class="more-row' + (cls ? " " + cls : "") + '"><h3 class="more-label">' + label + '</h3><p>' + esc(text) + '</p></div>' : ""; };
     // A hotel shows a photo here only when it is the hotel itself, never an area view.
     var img = "", cr = null;
@@ -230,7 +245,7 @@
     var body = spots
       ? lead("Where to stand", m.spots) + row("Poses to try", m.poses) + row("Camera angle", m.angles) + row("Best light", m.light) + row("Beat the crowds", m.crowds)
       : info ? lead("", m.lead) + row("What it is", m.what) + row("When we were there", entry.past.visit) + row("Best time to go", m.best) + row("Good to know", m.tips) + row("If we go again", m.again) + row("Places we saved here", (m.pins || []).join(" · "))
-      : lead("", m.why) + (p.nights && p.why && p.why !== m.why ? row("About our stay", p.why) : "") + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + listRow("Nearby", m.nearby) + listRow("Breakfast nearby", m.breakfast) + row("Skip it if", m.skip, "skip");
+      : lead("", m.why) + (p.nights && p.why && p.why !== m.why ? row("About our stay", p.why) : "") + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + shopRow("Shops: Saturday hours, pay and prices", m.shops) + phraseRow(m.phrasesTitle || "Ordering card: show this to the staff", m.phrases) + listRow("Nearby", m.nearby) + listRow("Breakfast nearby", m.breakfast) + row("Skip it if", m.skip, "skip");
     var foot = spots
       ? '<div class="links seg"><a class="btn" href="' + u("https://www.google.com/search?tbm=isch&q=" + q(p.name + " best photo spot")) + '" target="_blank" rel="noopener noreferrer">More example photos</a>' +
         (m.tag ? '<a class="btn" href="' + u("https://www.instagram.com/explore/tags/" + encodeURIComponent(m.tag) + "/") + '" target="_blank" rel="noopener noreferrer">#' + esc(m.tag) + ' on Instagram</a>' : "") + '</div>'
