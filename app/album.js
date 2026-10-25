@@ -350,6 +350,7 @@
             ((s.proof || []).length ? '<ul class="stay-proof">' + s.proof.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : "") + infoLink(s) + '<div class="card-actions">' + moreButton(s, null, s.past) + linkRow(s) + '</div></div></article>';
         }).join("") + '</div></section>';
     }
+    if ((h.bookings || []).length) html += bookingsBox(h, fold);
 
     html += '<section><div class="section-head"><h2>Day by day</h2><span class="eyebrow">Tap a day to see its trains, tips and stops</span>' +
       ((h.days || []).length > 1 ? '<button class="btn small days-all" type="button" data-h="' + esc(h.id) + '">' + (fold.days.length >= h.days.length ? "Close all days" : "Open all days") + '</button>' : "") + '</div>';
@@ -2125,6 +2126,34 @@
     if (m) openPhotoMem(m, b, b.classList.contains("see-all") ? v.mems : null);
   }
 
+  // ---------- bookings ----------
+  // Every booking in one fold, in date order: when, status, who we booked with, how to reach them,
+  // the rules that matter, what we were told, and what is still to do. References show the last 4 digits only.
+  function telLink(t) { var n = String(t).replace(/[^\d+]/g, ""); return /^\+?\d{6,15}$/.test(n) ? '<a href="tel:' + n + '">' + esc(t) + '</a>' : esc(t); }
+  function mailLink(m) { return /^[\w.+\-]+@[\w\-]+(\.[\w\-]+)+$/.test(m) ? '<a href="mailto:' + esc(m) + '">' + esc(m) + '</a>' : esc(m); }
+  function bookingStatus(b) {
+    var st = String(b.status || "").toLowerCase();
+    return /to book|not booked|to arrange|option/.test(st) ? ["warn", st.indexOf("option") >= 0 ? "Optional" : "Still to book"] : /book|paid|confirm/.test(st) ? ["ok", "Booked"] : st ? ["", b.status] : ["", ""];
+  }
+  function bookingsBox(h, fold) {
+    var list = h.bookings.slice().sort(function (a, b) { var x = String(a.date || "") + (a.time || ""), y = String(b.date || "") + (b.time || ""); return x < y ? -1 : x > y ? 1 : 0; });
+    var todo = list.filter(function (b) { return (b.todo || []).length || bookingStatus(b)[1] === "Still to book"; }).length;
+    function row(k, v) { return v ? '<div><dt>' + k + '</dt><dd>' + v + '</dd></div>' : ""; }
+    function lines(x) { x = [].concat(x || []).filter(Boolean); return x.length ? x.length === 1 ? esc(x[0]) : '<ul>' + x.map(function (y) { return '<li>' + esc(y) + '</li>'; }).join("") + '</ul>' : ""; }
+    return '<section id="' + esc(h.id) + '-bookings"><div class="section-head"><h2>Our bookings</h2><span class="eyebrow">Everything we booked, in date order</span></div>' +
+      '<details class="tipbox fold bookings" data-fold="bookings"' + (fold.bookings ? " open" : "") + '><summary><h4><span aria-hidden="true">🧾</span> ' + list.length + (list.length === 1 ? " booking" : " bookings") + (todo ? ' · ' + todo + ' with something to do' : "") + '</h4><span class="fold-hint" aria-hidden="true"></span></summary><div class="book-list">' +
+      list.map(function (b) {
+        var st = bookingStatus(b), c = b.contact || {};
+        var when = (b.date ? nice(b.date, true) : "") + (b.time ? " · " + b.time : "");
+        var contact = [c.phone ? telLink(c.phone) : "", c.email ? mailLink(c.email) : "", c.note ? esc(c.note) : ""].filter(Boolean).join(" · ");
+        return '<article class="book' + ((b.todo || []).length || st[1] === "Still to book" ? " has-todo" : "") + '"><div class="book-top"><span class="book-when">' + esc(when) + '</span>' + (st[1] ? '<span class="stay-status ' + st[0] + '">' + esc(st[1]) + '</span>' : "") + '</div>' +
+          '<h3>' + esc(b.what || "") + '</h3><dl>' +
+          row("Details", lines(b.details)) + row("Where", lines(b.where)) + row("Booked with", lines(b.by)) + row("Booking no. ends", lines(b.ref)) + row("Contact", contact) +
+          row("Good to know", lines(b.rules)) + row("They told us", lines(b.replies)) + row("Still to do", lines(b.todo)) + row("Confirmation", lines(b.find)) +
+          '</dl></article>';
+      }).join("") + '</div></details></section>';
+  }
+
   // ---------- folding ----------
   // Each day is a fold. We remember which days are open (and the tips and keeper folds) per trip,
   // so a redraw keeps them, and today's day always opens on a new day of the trip.
@@ -2144,8 +2173,8 @@
   function foldRead(id) {
     var f = foldMem[id]; if (!f) return;
     f.days = [].map.call(document.querySelectorAll('details.day[data-h="' + id + '"][open]'), function (d) { return +d.dataset.day; });
-    var t = document.querySelector('details[data-fold="tips"]'), k = document.querySelector('details[data-fold="keeper"]');
-    if (t) f.tips = t.open; if (k) f.keeper = k.open;
+    var t = document.querySelector('details[data-fold="tips"]'), k = document.querySelector('details[data-fold="keeper"]'), bk = document.querySelector('details[data-fold="bookings"]');
+    if (t) f.tips = t.open; if (k) f.keeper = k.open; if (bk) f.bookings = bk.open;
     foldSave(id);
     var all = document.querySelector(".days-all"), n = document.querySelectorAll('details.day[data-h="' + id + '"]').length;
     if (all) all.textContent = f.days.length >= n ? "Close all days" : "Open all days";

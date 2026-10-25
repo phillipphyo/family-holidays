@@ -770,3 +770,17 @@ details.keeper .tipbox, details.keeper .plan-box { margin-top: 12px; }
 .ticket .stub.has-photo::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(10,14,40,.35), rgba(10,14,40,.7)); }
 .ticket .stub.has-photo .d, .ticket .stub.has-photo .big { text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 @media (max-width: 560px) { .ticket .stub.has-photo { min-height: 96px; align-items: flex-end; } }
+/* Our bookings: one card per booking inside a fold. */
+.tipbox.bookings { max-width: none; }
+.book-list { display: grid; gap: 12px; align-items: start; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); margin-top: 4px; }
+.book { border: 1px solid var(--hair); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; background: var(--surface); }
+.book.has-todo { border-left: 4px solid #d97706; }
+.book-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.book-when { font: 500 12px/1.3 var(--mono); letter-spacing: .04em; color: var(--muted); }
+.book h3 { font-size: 17px; margin: 0; }
+.book dl { margin: 0; display: grid; gap: 6px; font-size: 14px; }
+.book dl div { display: grid; gap: 1px; }
+.book dt { font: 700 11px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.book dd { margin: 0; overflow-wrap: anywhere; }
+.book dd ul { margin: 0; padding-left: 18px; }
+.book dd a { color: var(--indigo); }
