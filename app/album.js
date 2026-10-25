@@ -339,7 +339,7 @@
 
     var stays = (h.stays || []).length ? h.stays : past ? pastStays(h, visits) : [];
     if (stays.length) {
-      html += '<section><div class="section-head"><h2>' + (past ? "Where we stayed" : "Where we stay") + '</h2><span class="eyebrow">' + (past ? "Night by night" : "And why we chose it") + '</span></div><div class="stays">' +
+      html += '<section><div class="section-head"><h2>' + (past ? "Where we stayed" : "Where we stay") + '</h2><span class="eyebrow">' + (past ? "Night by night" : "And why we chose it") + '</span></div>' + staysSummary(stays, fold, past) + '<div class="stays">' +
         stays.map(function (s) {
           var tm = stayTimes(s), toBook = /to book/i.test(s.nights || ""), short = !s.past && s.more;
           return '<article class="stay">' + pic({ image: s.image, vk: s.vk, wiki: s.wiki, credit: s.credit, name: s.name, type: "hotel", label: s.city, area: s.areaPhoto, decorative: true }) +
@@ -348,7 +348,7 @@
             (tm ? '<p class="stay-times">' + esc(tm) + '</p>' : "") +
             (s.why && !short ? '<p class="muted">' + esc(s.why) + '</p>' : "") +
             ((s.proof || []).length ? '<ul class="stay-proof">' + s.proof.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : "") + infoLink(s) + '<div class="card-actions">' + moreButton(s, null, s.past) + linkRow(s) + '</div></div></article>';
-        }).join("") + '</div></section>';
+        }).join("") + '</div></details></section>';
     }
     if ((h.bookings || []).length) html += bookingsBox(h, fold);
 
@@ -2135,6 +2135,12 @@
     var st = String(b.status || "").toLowerCase();
     return /to book|not booked|to arrange|option/.test(st) ? ["warn", st.indexOf("option") >= 0 ? "Optional" : "Still to book"] : /book|paid|confirm/.test(st) ? ["ok", "Booked"] : st ? ["", b.status] : ["", ""];
   }
+  // "Where we stay" folds like "Our bookings": the summary names the hotels, the cards open on a tap.
+  function staysSummary(stays, fold, past) {
+    var names = stays.map(function (s) { return s.name; }), todo = stays.filter(function (s) { return /to book/i.test(s.nights || ""); }).length;
+    return '<details class="tipbox fold stays-fold" data-fold="stays"' + (fold.stays ? " open" : "") + '><summary><h4><span aria-hidden="true">🏨</span> ' + stays.length + (stays.length === 1 ? " place" : " places") + (past ? ' we stayed' : ' to sleep') + (todo ? ' · ' + todo + ' still to book' : "") +
+      '<span class="fold-names">' + esc(names.slice(0, 4).join(" · ")) + (names.length > 4 ? ' +' + (names.length - 4) + ' more' : "") + '</span></h4><span class="fold-hint" aria-hidden="true"></span></summary>';
+  }
   function bookingsBox(h, fold) {
     var list = h.bookings.slice().sort(function (a, b) { var x = String(a.date || "") + (a.time || ""), y = String(b.date || "") + (b.time || ""); return x < y ? -1 : x > y ? 1 : 0; });
     var todo = list.filter(function (b) { return (b.todo || []).length || bookingStatus(b)[1] === "Still to book"; }).length;
@@ -2173,8 +2179,8 @@
   function foldRead(id) {
     var f = foldMem[id]; if (!f) return;
     f.days = [].map.call(document.querySelectorAll('details.day[data-h="' + id + '"][open]'), function (d) { return +d.dataset.day; });
-    var t = document.querySelector('details[data-fold="tips"]'), k = document.querySelector('details[data-fold="keeper"]'), bk = document.querySelector('details[data-fold="bookings"]');
-    if (t) f.tips = t.open; if (k) f.keeper = k.open; if (bk) f.bookings = bk.open;
+    var t = document.querySelector('details[data-fold="tips"]'), k = document.querySelector('details[data-fold="keeper"]'), bk = document.querySelector('details[data-fold="bookings"]'), sf = document.querySelector('details[data-fold="stays"]');
+    if (t) f.tips = t.open; if (k) f.keeper = k.open; if (bk) f.bookings = bk.open; if (sf) f.stays = sf.open;
     foldSave(id);
     var all = document.querySelector(".days-all"), n = document.querySelectorAll('details.day[data-h="' + id + '"]').length;
     if (all) all.textContent = f.days.length >= n ? "Close all days" : "Open all days";

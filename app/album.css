@@ -784,3 +784,7 @@ details.keeper .tipbox, details.keeper .plan-box { margin-top: 12px; }
 .book dd { margin: 0; overflow-wrap: anywhere; }
 .book dd ul { margin: 0; padding-left: 18px; }
 .book dd a { color: var(--indigo); }
+/* Where we stay, folded like Our bookings. */
+.tipbox.stays-fold { max-width: none; }
+.stays-fold .stays { margin-top: 6px; }
+.fold-names { display: block; font: 400 13px/1.4 var(--body); color: var(--muted); margin-top: 2px; }
