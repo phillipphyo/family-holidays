@@ -211,7 +211,7 @@
     var body = spots
       ? lead("Where to stand", m.spots) + row("Poses to try", m.poses) + row("Camera angle", m.angles) + row("Best light", m.light) + row("Beat the crowds", m.crowds)
       : info ? lead("", m.lead) + row("What it is", m.what) + row("When we were there", entry.past.visit) + row("Best time to go", m.best) + row("Good to know", m.tips) + row("If we go again", m.again) + row("Places we saved here", (m.pins || []).join(" · "))
-      : lead("", m.why) + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + row("Skip it if", m.skip, "skip");
+      : lead("", m.why) + (p.nights && p.why && p.why !== m.why ? row("About our stay", p.why) : "") + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + row("Skip it if", m.skip, "skip");
     var foot = spots
       ? '<div class="links seg"><a class="btn" href="' + u("https://www.google.com/search?tbm=isch&q=" + q(p.name + " best photo spot")) + '" target="_blank" rel="noopener noreferrer">More example photos</a>' +
         (m.tag ? '<a class="btn" href="' + u("https://www.instagram.com/explore/tags/" + encodeURIComponent(m.tag) + "/") + '" target="_blank" rel="noopener noreferrer">#' + esc(m.tag) + ' on Instagram</a>' : "") + '</div>'
@@ -297,7 +297,7 @@
     var nights = nDays - 1;
     var cities = (h.route || []).filter(function (r, i, a) { return r.nights != null; }).length;
     var placeCount = (h.days || []).reduce(function (n, d) { return n + (d.places || []).length; }, 0);
-    var byDate = {}, past = isPastTrip(h), visits = past ? visitsFor(h) : {};
+    var byDate = {}, past = isPastTrip(h), visits = past ? visitsFor(h) : {}, fold = foldGet(h);
     (h.memories || []).forEach(function (m) { (byDate[m.date] = byDate[m.date] || []).push(m); });
 
     var html = '<section class="cover">' + pic({ image: h.cover.image, wiki: h.cover.wiki, credit: h.cover.credit, name: h.title }) +
@@ -310,9 +310,10 @@
       '<div><span class="eyebrow">Stops</span><b>' + placeCount + '</b></div>' +
       ((h.memories || []).length ? '<div><span class="eyebrow">Photos</span><b>' + h.memories.length + '</b></div>' : "") + '</div>' +
       (h.walkingTotal ? '<p class="muted walk-total">' + esc(h.walkingTotal) + '</p>' : "") +
-      ((h.journeyTips || []).length ? '<div class="tipbox"><h4><span aria-hidden="true">🚆</span> Getting around, every day</h4><ul>' + h.journeyTips.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>' +
-        (h.journeyNote ? '<p class="muted">' + esc(h.journeyNote) + '</p>' : "") + '</div>' : "") + (past ? infoBox(h) : planBox(h)) + quickBox(h) +
-      '<div class="summary">' + (h.travellers ? '<p class="eyebrow">' + esc(h.travellers) + '</p>' : "") + (h.summary ? '<p>' + esc(h.summary) + '</p>' : "") +
+      dayChips(h, fold) +
+      ((h.journeyTips || []).length ? '<details class="tipbox fold" data-fold="tips"' + (fold.tips ? " open" : "") + '><summary><h4><span aria-hidden="true">🚆</span> Getting around: ' + h.journeyTips.length + (h.journeyTips.length === 1 ? " tip" : " tips") + '</h4><span class="fold-hint" aria-hidden="true"></span></summary><ul>' + h.journeyTips.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>' +
+        (h.journeyNote ? '<p class="muted">' + esc(h.journeyNote) + '</p>' : "") + '</details>' : "") + (quickBox(h) ? '<p class="notice keeper-note">This trip opens slowly on phones. <button class="btn small keeper-open" type="button">Fix it at the bottom of the page</button></p>' : "") +
+      '<div class="summary">' + (h.travellers ? '<p class="eyebrow">' + esc(h.travellers) + '</p>' : "") + summaryText(h.summary) +
       ((h.links || []).length ? '<div class="links">' + h.links.map(function (l, i) { return '<a class="btn' + (i ? "" : " primary") + '" href="' + u(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.label) + '</a>'; }).join("") + '</div>' : "") + '</div>';
 
     if ((h.route || []).length) {
@@ -328,26 +329,36 @@
     if (stays.length) {
       html += '<section><div class="section-head"><h2>' + (past ? "Where we stayed" : "Where we stay") + '</h2><span class="eyebrow">' + (past ? "Night by night" : "And why we chose it") + '</span></div><div class="stays">' +
         stays.map(function (s) {
+          var tm = stayTimes(s), toBook = /to book/i.test(s.nights || ""), short = !s.past && s.more;
           return '<article class="stay">' + pic({ image: s.image, vk: s.vk, wiki: s.wiki, credit: s.credit, name: s.name, type: "hotel", label: s.city, area: s.areaPhoto, decorative: true }) +
-            '<div class="body"><span class="eyebrow">' + esc(s.city) + ' · ' + esc(s.nights) + '</span><h3>' + esc(s.name) + '</h3>' +
-            (s.why ? '<p class="muted">' + esc(s.why) + '</p>' : "") +
+            '<div class="body"><span class="eyebrow">' + esc(s.city) + ' · ' + esc(String(s.nights || "").replace(/\s*\((booked|chosen, to book|to book)\)/i, "")) + '</span><h3>' + esc(s.name) + '</h3>' +
+            (/\(booked\)/i.test(s.nights || "") ? '<span class="stay-status ok">Booked</span>' : toBook ? '<span class="stay-status warn">Still to book</span>' : "") +
+            (tm ? '<p class="stay-times">' + esc(tm) + '</p>' : "") +
+            (s.why && !short ? '<p class="muted">' + esc(s.why) + '</p>' : "") +
             ((s.proof || []).length ? '<ul class="stay-proof">' + s.proof.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : "") + infoLink(s) + '<div class="card-actions">' + moreButton(s, null, s.past) + linkRow(s) + '</div></div></article>';
         }).join("") + '</div></section>';
     }
 
-    html += '<section><div class="section-head"><h2>Day by day</h2><span class="eyebrow">Each day, then its stops in order</span></div>';
+    html += '<section><div class="section-head"><h2>Day by day</h2><span class="eyebrow">Tap a day to see its trains, tips and stops</span>' +
+      ((h.days || []).length > 1 ? '<button class="btn small days-all" type="button" data-h="' + esc(h.id) + '">' + (fold.days.length >= h.days.length ? "Close all days" : "Open all days") + '</button>' : "") + '</div>';
     (h.days || []).forEach(function (d, i) {
       var dd = parseDate(d.date), route = dayRouteUrl(d), mem = byDate[d.date] || [];
       delete byDate[d.date];
-      html += '<article class="day" id="' + esc(h.id + "-day" + (i + 1)) + '"><div class="ticket">' +
-        '<div class="stub"><span class="d">Day ' + (i + 1) + '</span><span class="big">' + dd.getDate() + '</span><span class="d">' + WD[dd.getDay()] + ' ' + MON[dd.getMonth()] + '</span></div>' +
-        '<div class="main"><h3>' + esc(d.title || d.city || "") + '</h3>' +
-        '<div class="meta">' + (d.city ? '<span>In <b>' + esc(d.city) + '</b></span>' : "") + (d.sleep ? '<span>Sleep at <b>' + esc(d.sleep) + '</b></span>' : "") + '</div>' +
+      var n = i + 1, names = (d.places || []).map(function (p) { return p.name; }), isOpen = fold.days.indexOf(n) >= 0;
+      var ci = checkInFor(h, stays, i), photosN = past ? mem.length : 0;
+      html += '<details class="day" id="' + esc(h.id + "-day" + n) + '" data-h="' + esc(h.id) + '" data-day="' + n + '"' + (isOpen ? " open" : "") + '><summary class="day-sum"><div class="ticket">' +
+        '<div class="stub" aria-hidden="true"><span class="d">Day ' + n + '</span><span class="big">' + dd.getDate() + '</span><span class="d">' + WD[dd.getDay()] + ' ' + MON[dd.getMonth()] + '</span></div>' +
+        '<div class="main"><h3><span class="sr-only">Day ' + n + ', ' + WD[dd.getDay()] + ' ' + dd.getDate() + ' ' + MON[dd.getMonth()] + ': </span>' + esc(d.title || d.city || "") + '</h3>' +
+        '<div class="meta">' + (d.city ? '<span>In <b>' + esc(d.city) + '</b></span>' : "") + (d.sleep ? '<span>Sleep at <b>' + esc(d.sleep) + '</b>' + (ci ? ' · check-in ' + esc(ci) : "") + '</span>' : "") + '</div>' +
+        (names.length ? '<p class="day-stops">' + esc(names.slice(0, 3).join(" · ")) + (names.length > 3 ? ' <span class="muted">+' + (names.length - 3) + ' more</span>' : "") + '</p>' : "") +
+        (photosN ? '<p class="day-photos"><span aria-hidden="true">📷</span> ' + photosN + (photosN === 1 ? " photo" : " photos") + '</p>' : "") +
+        '<span class="day-toggle" aria-hidden="true"><span class="t-show">Show the day</span><span class="t-hide">Hide the day</span><span class="chev" aria-hidden="true"></span></span>' +
+        '</div></div></summary><div class="day-body"><div class="day-info">' +
+        (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") +
         (d.travel ? '<p class="travel">' + esc(d.travel) + '</p>' : "") +
         (d.walk || d.ifTired ? '<div class="walk">' + (d.walk ? '<span><b>Walking</b> ' + esc(d.walk) + '</span>' : "") + (d.ifTired ? '<span><b>If tired</b> ' + esc(d.ifTired) + '</span>' : "") + '</div>' : "") +
-        (past && !(d.journeys || []).length ? journeyList(likelyJourneys(h, i), "Journeys, our best guess from the photos") : journeyList(d.journeys)) +
-        (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") +
-        '</div></div>';
+        (past && !(d.journeys || []).length ? guessJourneys(likelyJourneys(h, i)) : journeyList(d.journeys)) +
+        '</div>';
       var shots = {};
       mem.forEach(function (m) { if (m.stop) shots[m.stop] = (shots[m.stop] || 0) + 1; });
       var used = [];
@@ -357,10 +368,13 @@
           if (v) used = used.concat(v.mems);
           var tonight = d.sleep && p.name.toLowerCase().indexOf(d.sleep.split(",")[0].toLowerCase()) === 0;
           return '<div class="stop-block' + (tonight || p.type === "hotel" ? " is-hotel" : "") + '">' + card +
-            (v && v.mems.length ? memoryGrid(v.mems.slice(), true) : '<p class="muted stop-none">No photos at this stop.</p>') + '</div>';
+            (v && v.mems.length ? '<div class="stop-strip">' + memoryGrid(v.mems.slice(0, 4), true) +
+              (v.mems.length > 4 && stills(v.mems) ? '<button class="btn small place-photos see-all" type="button" data-h="' + esc(h.id) + '" data-k="' + n + '.' + (pi + 1) + '">See all ' + countWord(stills(v.mems), "photo") + '</button>' : "") + '</div>'
+              : '<p class="muted stop-none">No photos at this stop.</p>') + '</div>';
         }).join("") + '</div>';
         var left = mem.filter(function (m) { return used.indexOf(m) < 0; });
-        if (left.length) html += '<div class="stop-left"><h4><span aria-hidden="true">📷</span> Other photos this day <span class="muted">' + left.length + '</span></h4>' + memoryGrid(left, true) + '</div>';
+        if (left.length) html += '<div class="stop-left"><h4><span aria-hidden="true">📷</span> Other photos this day <span class="muted">' + left.length + '</span></h4><div class="stop-strip">' + memoryGrid(left.slice(0, 4), true) +
+          (left.length > 4 && stills(left) ? '<button class="btn small left-photos see-all" type="button" data-left="' + (leftReg.push(left) - 1) + '">See all ' + countWord(stills(left), "photo") + '</button>' : "") + '</div></div>';
         mem = [];
       } else if ((d.places || []).length) {
         html += '<div class="places">' + d.places.map(function (p, pi) {
@@ -372,12 +386,12 @@
         }).join("") + '</div>';
       }
       if (mem.length) html += memoryGrid(mem);
-      html += '</article>';
+      html += '<p class="day-end"><button class="btn small day-hide" type="button" data-day="' + n + '">Hide Day ' + n + '</button></p></div></details>';
     });
     var extra = Object.keys(byDate).sort();
     extra.forEach(function (date) {
-      html += '<article class="day"><div class="ticket"><div class="stub"><span class="d">Extra</span><span class="big">' + parseDate(date).getDate() + '</span><span class="d">' + niceShort(date) + '</span></div>' +
-        '<div class="main"><h3>More photos</h3></div></div>' + memoryGrid(byDate[date]) + '</article>';
+      html += '<details class="day extra" id="' + esc(h.id + "-extra-" + date) + '"><summary class="day-sum"><div class="ticket"><div class="stub" aria-hidden="true"><span class="d">Extra</span><span class="big">' + parseDate(date).getDate() + '</span><span class="d">' + niceShort(date) + '</span></div>' +
+        '<div class="main"><h3><span class="sr-only">Extra day, ' + esc(niceShort(date)) + ': </span>More photos</h3><p class="day-photos"><span aria-hidden="true">📷</span> ' + byDate[date].length + ' photos</p><span class="day-toggle" aria-hidden="true"><span class="t-show">Show the day</span><span class="t-hide">Hide the day</span><span class="chev" aria-hidden="true"></span></span></div></div></summary><div class="day-body">' + memoryGrid(byDate[date]) + '</div></details>';
     });
     html += '</section>';
 
@@ -393,6 +407,8 @@
       html += '<section><div class="section-head"><h2>Our photos</h2></div><div class="empty"><b>No photos yet.</b>' +
         '<p>After the trip, open <a href="#rebuild">Add your photos</a>, choose "Add to: ' + esc(h.title) + '" and pick your photos. Each photo goes under the day it was taken, next to the nearest stop.</p></div></section>';
     }
+    var keep = (past ? infoBox(h) : planBox(h)) + quickBox(h);
+    if (keep) html += '<section><details class="keeper" id="keeper"' + (fold.keeper ? " open" : "") + ' data-fold="keeper"><summary><h2>For the album keeper</h2><span class="fold-hint" aria-hidden="true"></span></summary>' + keep + '</details></section>';
     return frame(h.id, html);
   }
   // A stop card on a past trip: our own photo, the times we were there, and the information.
@@ -402,7 +418,7 @@
             '<div class="body"><div class="top"><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
             (v && v.first ? '<span class="time">' + esc(v.first + (v.last && v.last !== v.first ? " to " + v.last : "")) + '</span>' : "") + (v ? '<span class="time">📷 ' + v.mems.length + '</span>' : "") + '</div>' +
             '<h4>' + esc(p.name) + '</h4>' + (p.info && p.info.lead ? '<p class="note">' + esc(p.info.lead) + '</p>' : "") +
-            '<div class="card-actions">' + moreButton(p, d.city, { visit: visitText(d, v), pic: own, photos: own ? '<button class="more-btn spots place-photos" type="button" data-h="' + esc(h.id) + '" data-k="' + vk + '"><span aria-hidden="true">◎</span>Our photos here</button>' : "" }) + linkRow(p) + '</div></div></div>';
+            '<div class="card-actions">' + moreButton(p, d.city, { visit: visitText(d, v), pic: own, photos: "" }) + linkRow(p) + '</div></div></div>';
   }
   // Each ride as "how: time, how often, cost", with the part before the first colon in bold.
   function journeyList(list, title) {
@@ -581,9 +597,9 @@
   }
   function stepPhoto(n) { var k = lbAt + n; if (k < 0 || k >= lbList.length) return; lbAt = k; viewer().classList.remove("zoomed"); showPhoto(); }
   function openPhoto(mid, opener) { if (memReg[mid]) openPhotoMem(memReg[mid], opener); }
-  function openPhotoMem(m, opener) {
+  function openPhotoMem(m, opener, only) {
     var h = holidays.filter(function (x) { return x.memories && x.memories.indexOf(m) >= 0; })[0];
-    lbList = (h ? h.memories : memReg).filter(function (x) { return x.kind !== "video"; });
+    lbList = (only || (h ? h.memories : memReg)).filter(function (x) { return x.kind !== "video"; });
     lbAt = Math.max(0, lbList.indexOf(m));
     var d = viewer(); d._opener = opener;
     showPhoto();
@@ -1871,6 +1887,7 @@
         if (mm) showMore(mm);
         var ib = e.target.closest && e.target.closest(".info-copy, .info-check, .info-save, .info-list");
         if (ib) infoClick(ib);
+        if (foldClick(e)) return;
         var pb = e.target.closest && e.target.closest(".plan-save");
         if (pb && !pb.disabled) planSave(pb);
         var qg = e.target.closest && e.target.closest(".quick-go");
@@ -1879,6 +1896,11 @@
         if (sp) openStopPhotos(sp);
       });
       document.addEventListener("change", function (e) { if (e.target.classList && e.target.classList.contains("plan-file")) planPick(e.target); });
+      document.addEventListener("toggle", function (e) {
+        var t = e.target; if (!t.matches || !t.matches("details.day, details[data-fold]")) return;
+        var hid = t.dataset.h || ((document.querySelector("details.day[data-h]") || {}).dataset || {}).h;
+        if (hid) foldRead(hid);
+      }, true);
     }
     render();
   }
@@ -2088,7 +2110,91 @@
   function openStopPhotos(b) {
     var h = holidays.filter(function (x) { return x.id === b.dataset.h; })[0], v = h && visitsFor(h)[b.dataset.k];
     var m = v && v.mems.filter(function (x) { return x.kind !== "video"; })[0];
-    if (m) openPhotoMem(m, b);
+    if (m) openPhotoMem(m, b, b.classList.contains("see-all") ? v.mems : null);
+  }
+
+  // ---------- folding ----------
+  // Each day is a fold. We remember which days are open (and the tips and keeper folds) per trip,
+  // so a redraw keeps them, and today's day always opens on a new day of the trip.
+  var foldMem = {}, leftReg = [];
+  function todayDay(h) { var t = today(), k = -1; (h.days || []).forEach(function (d, i) { if (d.date === t) k = i + 1; }); return k; }
+  function foldGet(h) {
+    var f = foldMem[h.id], t = todayDay(h);
+    if (!f) {
+      try { f = JSON.parse(sessionStorage.getItem("album-open:" + h.id) || "null"); } catch (e) { f = null; }
+      if (!f || !Array.isArray(f.days)) f = { days: [t > 0 ? t : 1], tips: false, keeper: false, date: today() };
+      foldMem[h.id] = f;
+    }
+    if (f.date !== today()) { if (t > 0 && f.days.indexOf(t) < 0) f.days.push(t); f.date = today(); foldSave(h.id); }
+    return f;
+  }
+  function foldSave(id) { try { sessionStorage.setItem("album-open:" + id, JSON.stringify(foldMem[id])); } catch (e) { } }
+  function foldRead(id) {
+    var f = foldMem[id]; if (!f) return;
+    f.days = [].map.call(document.querySelectorAll('details.day[data-h="' + id + '"][open]'), function (d) { return +d.dataset.day; });
+    var t = document.querySelector('details[data-fold="tips"]'), k = document.querySelector('details[data-fold="keeper"]');
+    if (t) f.tips = t.open; if (k) f.keeper = k.open;
+    foldSave(id);
+    var all = document.querySelector(".days-all"), n = document.querySelectorAll('details.day[data-h="' + id + '"]').length;
+    if (all) all.textContent = f.days.length >= n ? "Close all days" : "Open all days";
+  }
+  function openDay(id, n, scroll) {
+    var d = document.getElementById(id + "-day" + n); if (!d) return false;
+    d.open = true; foldRead(id);
+    if (scroll) d.scrollIntoView({ block: "start" });
+    return true;
+  }
+  function dayChips(h, fold) {
+    if ((h.days || []).length < 5) return "";
+    var t = todayDay(h);
+    return '<nav class="day-chips" aria-label="Jump to a day">' + h.days.map(function (d, i) {
+      return '<button class="day-chip" type="button" data-h="' + esc(h.id) + '" data-day="' + (i + 1) + '">Day ' + (i + 1) + (t === i + 1 ? ' · Today' : "") + '</button>';
+    }).join("") + '</nav>';
+  }
+  // The first two sentences show; the rest folds under "Read more".
+  function summaryText(t) {
+    if (!t) return "";
+    var parts = String(t).split(/(?<=[.!?])\s+(?=[A-Z0-9"'(])/);
+    if (parts.length <= 2) return '<p>' + esc(t) + '</p>';
+    return '<p>' + esc(parts.slice(0, 2).join(" ").trim()) + '</p><details class="fold more-text"><summary>Read more</summary><p>' + esc(parts.slice(2).join(" ").trim()) + '</p></details>';
+  }
+  // Check-in and check-out times, taken from the hotel's own words.
+  function stayTimes(s) {
+    var w = String(s.why || "") + " " + String((s.more || {}).tips || ""), a = w.match(/check-in (?:is )?(?:from )?(\d{1,2}:\d{2})/i), b = w.match(/check-out (?:is )?(?:by )?(\d{1,2}:\d{2})/i);
+    return a || b ? (a ? "Check-in " + a[1] : "") + (a && b ? " · " : "") + (b ? "Check-out " + b[1] : "") : "";
+  }
+  // On the first night at a hotel, the day's headline shows its check-in time.
+  function checkInFor(h, stays, i) {
+    var d = h.days[i], prev = h.days[i - 1]; if (!d.sleep || (prev && prev.sleep === d.sleep)) return "";
+    var key = d.sleep.split(",")[0].toLowerCase(), s = (stays || []).filter(function (x) { return String(x.name).toLowerCase().indexOf(key) === 0; })[0];
+    var m = s && (String(s.why || "") + " " + String((s.more || {}).tips || "")).match(/check-in (?:is )?(?:from )?(\d{1,2}:\d{2})/i);
+    return m ? m[1] : "";
+  }
+  function stills(list) { return list.filter(function (m) { return m.kind !== "video"; }).length; }
+  function countWord(n, w) { return n + " " + w + (n === 1 ? "" : "s"); }
+  function guessJourneys(list) {
+    if (!(list || []).length) return "";
+    return '<details class="fold guess"><summary><span aria-hidden="true">🚆</span> Journeys, our best guess from the photos</summary>' + journeyList(list) + '</details>';
+  }
+  function foldClick(e) {
+    var c = e.target.closest && e.target.closest(".day-chip");
+    if (c) { openDay(c.dataset.h, c.dataset.day, true); var cs = document.querySelector('details.day[data-h="' + c.dataset.h + '"][data-day="' + c.dataset.day + '"] > summary'); if (cs) cs.focus({ preventScroll: true }); return true; }
+    var a = e.target.closest && e.target.closest(".days-all");
+    if (a) {
+      var ds = document.querySelectorAll('details.day[data-h="' + a.dataset.h + '"]'), open = a.textContent.indexOf("Open") === 0;
+      ds.forEach(function (d) { d.open = open; }); foldRead(a.dataset.h); return true;
+    }
+    var x = e.target.closest && e.target.closest(".day-hide");
+    if (x) {
+      var day = x.closest("details.day"), sm = day && day.querySelector("summary");
+      if (day) { day.open = false; foldRead(day.dataset.h); sm.focus({ preventScroll: true }); if (sm.getBoundingClientRect().top < 0) day.scrollIntoView({ block: "start" }); }
+      return true;
+    }
+    var l = e.target.closest && e.target.closest(".left-photos");
+    if (l) { var list = leftReg[+l.dataset.left] || [], m = list.filter(function (x) { return x.kind !== "video"; })[0]; if (m) openPhotoMem(m, l, list); return true; }
+    var k = e.target.closest && e.target.closest(".keeper-open");
+    if (k) { var kp = document.getElementById("keeper"); if (kp) { kp.open = true; kp.scrollIntoView({ block: "start" }); kp.querySelector("summary").focus({ preventScroll: true }); } return true; }
+    return false;
   }
 
   // ---------- update a plan from a file ----------
@@ -2122,7 +2228,7 @@
       var text = "/* Locked holiday file. Open the album and enter the passkey to see it. */\nHolidayAlbum.addLocked(" + JSON.stringify(lockedBox) + ");\n", name = h.id + ".js";
       var done = function (how) {
         msg.textContent = how + " Then tell Claude \"plan saved\".";
-        holidays = holidays.filter(function (x) { return x.id !== h.id; }); HolidayAlbum.add(h); var keep = msg.textContent; render(); var m2 = document.querySelector(".plan-box .plan-msg"); if (m2) { m2.textContent = keep; m2.closest("details").open = true; }
+        holidays = holidays.filter(function (x) { return x.id !== h.id; }); HolidayAlbum.add(h); var keep = msg.textContent; keepPlace(render); var m2 = document.querySelector(".plan-box .plan-msg"); if (m2) { m2.textContent = keep; m2.closest("details.plan-box").open = true; var kp = document.getElementById("keeper"); if (kp) kp.open = true; }
       };
       if (window.showDirectoryPicker) {
         return window.showDirectoryPicker({ id: "holidays", mode: "readwrite" }).then(function (dir) {
@@ -2358,9 +2464,14 @@
   }
   function keepPlace(fn) { var y = window.scrollY; fn(); window.scrollTo(0, y); }
   function render() {
+    var id = (location.hash || "#home").slice(1), dm = id.match(/^(.*)-day(\d+)$/), dayN = 0;
+    if (dm && holidays.some(function (x) { return x.id === dm[1]; })) {
+      if (document.getElementById(id) && document.querySelector('details.day[data-h="' + dm[1] + '"]')) { openDay(dm[1], dm[2], true); return; }
+      id = dm[1]; dayN = +dm[2];
+      var f0 = foldGet(holidays.filter(function (x) { return x.id === id; })[0]); if (f0.days.indexOf(dayN) < 0) f0.days.push(dayN);
+    }
     closeYt(false);
-    memReg = []; gridReg = [];
-    var id = (location.hash || "#home").slice(1);
+    memReg = []; gridReg = []; leftReg = [];
     var waitFor = id === "rebuild" ? holidays.map(function (x) { return x.id; }) : [id.replace(/-day\d+$/, "")];
     waitFor.forEach(function (hid) {
       if (!laterFor(hid).length) return;
@@ -2382,7 +2493,6 @@
       var pn = partsNotice(h.id), cov = root.querySelector("section.cover");
       if (pn && cov) cov.insertAdjacentHTML("afterend", pn);
     }
-    else if (id.indexOf("-day") > 0 && holidays.some(function (x) { return id.indexOf(x.id + "-day") === 0; })) return;
     else root.innerHTML = homeView();
     if (badFiles && id === "home") { var mainEl = root.querySelector("main"); if (mainEl) mainEl.insertAdjacentHTML("afterbegin", '<div class="notice" role="alert" style="margin-top:18px">' + (badFiles === 1 ? "One holiday file" : badFiles + " holiday files") + ' couldn\'t be opened, so that trip is missing. The file may be damaged or only half uploaded.</div>'); }
     wireMore(root);
@@ -2390,7 +2500,8 @@
     var lockBtn = root.querySelector('[data-action="lock"]');
     if (lockBtn) lockBtn.addEventListener("click", function () { HolidayAlbum.lock(); });
     wirePics(root);
-    if (!/-day\d+$/.test(id)) window.scrollTo(0, 0);
+    if (dayN) { var dEl = document.getElementById(id + "-day" + dayN); if (dEl) dEl.scrollIntoView({ block: "start" }); }
+    else window.scrollTo(0, 0);
     document.title = (h ? h.title + " · " : id === "rebuild" ? "Add your photos · " : "") + "Family Holiday Album";
   }
 
