@@ -100,6 +100,18 @@
   function creditText(cr, lead) {
     return (lead || "Photo") + (cr.by ? " by " + cr.by : " from Wikipedia") + (cr.licence ? " · " + cr.licence : "");
   }
+  // A trip's cover uses its own photo when the plan has one for the cover's place.
+  function coverOf(h) {
+    if (h.cover.image) return h.cover;
+    var w = h.cover.wiki, hit = null;
+    if (w) (h.days || []).forEach(function (d) { (d.places || []).forEach(function (p) { if (!hit && p.image && p.wiki === w) hit = p; }); });
+    return hit ? { image: hit.image, credit: hit.credit, wiki: w } : h.cover;
+  }
+  // The photo on a day's date stub: the day's first sight with a real photo, else any place with one.
+  function dayPhoto(d) {
+    var ps = (d.places || []).filter(function (p) { return p.image; }), good = ["sight", "nature", "shopping", "food"];
+    return ps.filter(function (p) { return good.indexOf(p.type) >= 0; })[0] || ps.filter(function (p) { return p.type === "hotel"; })[0] || ps[0] || null;
+  }
   function pic(opts) {
     var src = opts.image || (opts.wiki && (window.ALBUM_IMAGES || {})[opts.wiki]) || "";
     var wiki = !src && opts.wiki ? opts.wiki : "";
@@ -275,9 +287,9 @@
     var sorted = holidays.slice().sort(function (a, b) { return a.start < b.start ? 1 : -1; });
     var cards = sorted.map(function (h) {
       var st = status(h);
-      var cover = h.memories && h.memories[0] && !h.cover.image ? { image: h.memories[0].image } : {};
+      var hc = coverOf(h), cover = h.memories && h.memories[0] && !hc.image ? { image: h.memories[0].image } : {};
       return '<a class="trip-card" href="#' + esc(h.id) + '">' +
-        pic({ image: cover.image || h.cover.image, wiki: h.cover.wiki, credit: cover.image ? null : h.cover.credit, inLink: true, name: h.title, label: h.subtitle }) +
+        pic({ image: cover.image || hc.image, wiki: hc.wiki, credit: cover.image ? null : hc.credit, inLink: true, name: h.title, label: h.subtitle }) +
         '<div class="body"><span class="status ' + st.cls + '">' + esc(st.text) + '</span>' +
         '<h3>' + esc(h.title) + '</h3><p class="muted">' + esc(h.subtitle) + '</p>' +
         '<p class="eyebrow">' + esc(niceShort(h.start)) + ' to ' + esc(nice(h.end)) + ' · ' + (daysBetween(h.start, h.end) + 1) + ' days</p></div></a>';
@@ -300,7 +312,7 @@
     var byDate = {}, past = isPastTrip(h), visits = past ? visitsFor(h) : {}, fold = foldGet(h);
     (h.memories || []).forEach(function (m) { (byDate[m.date] = byDate[m.date] || []).push(m); });
 
-    var html = '<section class="cover">' + pic({ image: h.cover.image, wiki: h.cover.wiki, credit: h.cover.credit, name: h.title }) +
+    var hc = coverOf(h), html = '<section class="cover">' + pic({ image: hc.image, wiki: hc.wiki, credit: hc.credit, name: h.title }) +
       '<div class="shade"></div><div class="text"><span class="status ' + st.cls + '">' + esc(st.text) + '</span>' +
       '<h1>' + esc(h.title) + '</h1><p class="sub">' + esc(h.subtitle) + ' · ' + esc(nice(h.start, true)) + ' to ' + esc(nice(h.end, true)) + '</p></div></section>' +
       '<div class="facts">' +
@@ -345,9 +357,9 @@
       var dd = parseDate(d.date), route = dayRouteUrl(d), mem = byDate[d.date] || [];
       delete byDate[d.date];
       var n = i + 1, names = (d.places || []).map(function (p) { return p.name; }), isOpen = fold.days.indexOf(n) >= 0;
-      var ci = checkInFor(h, stays, i), photosN = past ? mem.length : 0;
+      var ci = checkInFor(h, stays, i), photosN = past ? mem.length : 0, dp = !past && dayPhoto(d);
       html += '<details class="day" id="' + esc(h.id + "-day" + n) + '" data-h="' + esc(h.id) + '" data-day="' + n + '"' + (isOpen ? " open" : "") + '><summary class="day-sum"><div class="ticket">' +
-        '<div class="stub" aria-hidden="true"><span class="d">Day ' + n + '</span><span class="big">' + dd.getDate() + '</span><span class="d">' + WD[dd.getDay()] + ' ' + MON[dd.getMonth()] + '</span></div>' +
+        '<div class="stub' + (dp ? ' has-photo' : '') + '" aria-hidden="true">' + (dp ? '<img class="stub-img" src="' + u(dp.image) + '" alt="" loading="lazy">' : '') + '<span class="d">Day ' + n + '</span><span class="big">' + dd.getDate() + '</span><span class="d">' + WD[dd.getDay()] + ' ' + MON[dd.getMonth()] + '</span></div>' +
         '<div class="main"><h3><span class="sr-only">Day ' + n + ', ' + WD[dd.getDay()] + ' ' + dd.getDate() + ' ' + MON[dd.getMonth()] + ': </span>' + esc(d.title || d.city || "") + '</h3>' +
         '<div class="meta">' + (d.city ? '<span>In <b>' + esc(d.city) + '</b></span>' : "") + (d.sleep ? '<span>Sleep at <b>' + esc(d.sleep) + '</b>' + (ci ? ' · check-in ' + esc(ci) : "") + '</span>' : "") + '</div>' +
         (names.length ? '<p class="day-stops">' + esc(names.slice(0, 3).join(" · ")) + (names.length > 3 ? ' <span class="muted">+' + (names.length - 3) + ' more</span>' : "") + '</p>' : "") +

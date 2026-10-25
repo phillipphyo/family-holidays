@@ -764,3 +764,9 @@ details.keeper .tipbox, details.keeper .plan-box { margin-top: 12px; }
 .stop-strip .see-all { margin-top: 8px; }
 @media (max-width: 720px) { .day-body { padding: 4px 14px 14px; } .stays .stay .pic { aspect-ratio: 21 / 9; } }
 @media (prefers-reduced-motion: reduce) { .day-toggle .chev, details.fold > summary::after, details.keeper > summary::after { transition: none; } }
+/* Day stubs carry a real photo of the day's main place, darkened so the date stays readable. */
+.ticket .stub.has-photo { color: #fff; overflow: hidden; isolation: isolate; }
+.ticket .stub .stub-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
+.ticket .stub.has-photo::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(10,14,40,.35), rgba(10,14,40,.7)); }
+.ticket .stub.has-photo .d, .ticket .stub.has-photo .big { text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+@media (max-width: 560px) { .ticket .stub.has-photo { min-height: 96px; align-items: flex-end; } }
