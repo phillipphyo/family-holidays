@@ -379,6 +379,7 @@
         (d.travel ? '<p class="travel">' + esc(d.travel) + '</p>' : "") +
         (d.walk || d.ifTired ? '<div class="walk">' + (d.walk ? '<span><b>Walking</b> ' + esc(d.walk) + '</span>' : "") + (d.ifTired ? '<span><b>If tired</b> ' + esc(d.ifTired) + '</span>' : "") + '</div>' : "") +
         (past && !(d.journeys || []).length ? guessJourneys(likelyJourneys(h, i)) : journeyList(d.journeys)) +
+        pickupList(d.pickups) +
         '</div>';
       var shots = {};
       mem.forEach(function (m) { if (m.stop) shots[m.stop] = (shots[m.stop] || 0) + 1; });
@@ -447,6 +448,15 @@
     return '<div class="journeys"><h4><span aria-hidden="true">🚆</span> ' + esc(title || "Journeys") + '</h4><ul>' + list.map(function (j) {
       var i = j.indexOf(": ");
       return '<li>' + (i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j)) + '</li>';
+    }).join("") + '</ul></div>';
+  }
+  // Where to catch each bus, train or taxi: a pin for each pick-up point, and a street photo where we have one.
+  function pickupList(list) {
+    list = (list || []).filter(function (x) { return x && x.name; });
+    if (!list.length) return "";
+    function a(url, label) { return /^https:\/\//i.test(url || "") ? ' <a class="pin-link" href="' + esc(safeUrl(url)) + '" target="_blank" rel="noopener noreferrer">' + label + ' <span aria-hidden="true">↗</span></a>' : ""; }
+    return '<div class="journeys pickups"><h4><span aria-hidden="true">📍</span> Where to catch it</h4><ul>' + list.map(function (x) {
+      return '<li><b>' + esc(x.name) + ':</b> ' + esc(x.where || "") + (x.approx ? ' <span class="approx">(pin is approximate)</span>' : "") + a(x.map, "Map") + a(x.photo, "Street photo") + '</li>';
     }).join("") + '</ul></div>';
   }
   // The YouTube player only appears after a tap, one at a time, built from the checked video id.
