@@ -325,6 +325,10 @@
         '<h3>' + esc(h.title) + '</h3><p class="muted">' + esc(h.subtitle) + '</p>' +
         '<p class="eyebrow">' + esc(niceShort(h.start)) + ' to ' + esc(nice(h.end)) + ' · ' + (daysBetween(h.start, h.end) + 1) + ' days</p></div></a>';
     }).join("");
+    cards += (window.HOLIDAY_SKIPPED || []).filter(function (c) { return !holidays.some(function (h) { return h.id === c.id; }); }).map(function (c) {
+      return '<div class="trip-card closed" aria-disabled="true"><div class="body"><span class="status closed"><span aria-hidden="true">🔒</span> Closed for now</span>' +
+        '<h3>' + esc(c.title || c.id) + '</h3><p class="muted">' + esc(c.why || "This holiday is closed for now.") + '</p></div></div>';
+    }).join("");
     cards += '<a class="trip-card add" href="#rebuild"><span class="eyebrow">Past holidays</span><h3>Add your photos</h3>' +
       '<p class="muted">Choose old photos. The album reads when and where each was taken, sorts them into days and suggests the place names.</p></a>';
     return frame("home",
@@ -1471,7 +1475,7 @@
       if (h && h.start < plan.hol.start) { at = k; break; }
     }
     out.splice.apply(out, [at, 0].concat(plan.names));
-    return "/*\n  The list of holiday files the album shows, newest first.\n  To add a holiday: put its file in this folder and add its name here.\n*/\nwindow.HOLIDAY_FILES = [\n" + out.map(function (n) { return '  "' + n + '"'; }).join(",\n") + "\n];\n";
+    return "/*\n  The list of holiday files the album shows, newest first.\n  To add a holiday: put its file in this folder and add its name here.\n*/\nwindow.HOLIDAY_FILES = [\n" + out.map(function (n) { return '  "' + n + '"'; }).join(",\n") + "\n];\n" + closedJs();
   }
   function giveFile(name, text) {
     var a = document.createElement("a");
@@ -1806,8 +1810,13 @@
     document.getElementById("rb-more-body").innerHTML = '<div class="row"><button class="btn" type="button" id="rb-list-js">Download the new list.js</button><span class="tag">Keeps the other trips and their order.</span></div>' +
       (small ? '<label for="rb-file" class="eyebrow">Holiday file as text</label><textarea id="rb-file" readonly placeholder="Press Copy to lock it and show it here"></textarea><div class="row"><button class="btn" type="button" id="rb-copy">Copy holiday file</button></div>' : "");
   }
+  // Keep the closed-holidays list when Claude's pages write a new list.js.
+  function closedJs() {
+    var c = window.HOLIDAY_CLOSED || []; if (!c.length) return "";
+    return "\n/*\n  Holidays closed for now: their files stay here but are not downloaded, and the home page shows a closed card.\n  The album keeper can open them on one device by visiting the page with #show-closed (and #hide-closed to close again).\n*/\nwindow.HOLIDAY_CLOSED = " + JSON.stringify(c, null, 2) + ";\n";
+  }
   function listJsNow() {
-    return "/*\n  The list of holiday files the album shows, newest first.\n  To add a holiday: put its file in this folder and add its name here.\n*/\nwindow.HOLIDAY_FILES = [\n" + (window.HOLIDAY_FILES || []).map(function (n) { return '  "' + n + '"'; }).join(",\n") + "\n];\n";
+    return "/*\n  The list of holiday files the album shows, newest first.\n  To add a holiday: put its file in this folder and add its name here.\n*/\nwindow.HOLIDAY_FILES = [\n" + (window.HOLIDAY_FILES || []).map(function (n) { return '  "' + n + '"'; }).join(",\n") + "\n];\n" + closedJs();
   }
   // Lock each part with the passkey, one after another, showing progress.
   function buildFiles(msg) {
@@ -2158,7 +2167,7 @@
         while (at >= 0 && at + 1 < list.length && list[at + 1].indexOf(h.id + ".photos-") === 0) at++;
         list.splice(at < 0 ? list.length : at + 1, 0, name);
       }
-      giveFile("list.js", "/*\n  The list of holiday files the album shows, newest first.\n  To add a holiday: put its file in this folder and add its name here.\n*/\nwindow.HOLIDAY_FILES = [\n" + list.map(function (n) { return '  "' + n + '"'; }).join(",\n") + "\n];\n");
+      giveFile("list.js", "/*\n  The list of holiday files the album shows, newest first.\n  To add a holiday: put its file in this folder and add its name here.\n*/\nwindow.HOLIDAY_FILES = [\n" + list.map(function (n) { return '  "' + n + '"'; }).join(",\n") + "\n];\n" + closedJs());
     }
   }
   // "Our photos here" opens the photo viewer at the first photo we took at that stop.

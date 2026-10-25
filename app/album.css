@@ -131,6 +131,9 @@ main section.cover { margin-top: 0; }
 .status.memory { background: var(--ink); color: var(--paper); }
 .trip-card.add { border: 2px dashed var(--line); background: transparent; box-shadow: none; justify-content: center; padding: 26px; gap: 10px; }
 .trip-card.add h3 { font-size: 22px; }
+.trip-card.closed { background: transparent; box-shadow: none; border: 2px solid var(--line); justify-content: center; cursor: default; }
+.trip-card.closed h3 { color: var(--muted); }
+.status.closed { background: var(--paper); color: var(--muted); border: 1px solid var(--line); }
 
 /* Holiday cover */
 .cover { position: relative; border-radius: 20px; overflow: hidden; box-shadow: var(--shadow-lg); }
@@ -246,6 +249,7 @@ footer.wrap::before { content: ""; position: absolute; left: 0; right: 0; top: 0
   .trip-card:hover .pic img { transform: scale(1.04); }
   .trip-card { transition: box-shadow .2s, transform .2s; }
   .trip-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .trip-card.closed:hover { transform: none; box-shadow: none; }
 }
 
 /* Passkey gate */
