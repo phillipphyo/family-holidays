@@ -206,6 +206,13 @@
     var p = entry.p, spots = entry.kind === "spots", info = entry.kind === "info", d = moreDialog();
     d._opener = document.activeElement;
     var m = spots ? p.spots : info ? p.info : p.more, hotel = !!(p.nights || p.type === "hotel");
+    // Nearby places and breakfast picks: a short list, each with its own Google Maps pin.
+    var listRow = function (label, list) {
+      list = (list || []).filter(function (x) { return x && x.name; }); if (!list.length) return "";
+      return '<div class="more-row"><h3 class="more-label">' + label + '</h3><ul class="more-list">' + list.map(function (x) {
+        return '<li><b>' + esc(x.name) + '</b>' + (x.note ? ' ' + esc(x.note) : "") + ' <a class="pin-link" href="' + u("https://www.google.com/maps/search/?api=1&query=" + q(x.map || x.name)) + '" target="_blank" rel="noopener noreferrer">Map <span aria-hidden="true">↗</span></a></li>';
+      }).join("") + '</ul></div>';
+    };
     var row = function (label, text, cls) { return text ? '<div class="more-row' + (cls ? " " + cls : "") + '"><h3 class="more-label">' + label + '</h3><p>' + esc(text) + '</p></div>' : ""; };
     // A hotel shows a photo here only when it is the hotel itself, never an area view.
     var img = "", cr = null;
@@ -223,7 +230,7 @@
     var body = spots
       ? lead("Where to stand", m.spots) + row("Poses to try", m.poses) + row("Camera angle", m.angles) + row("Best light", m.light) + row("Beat the crowds", m.crowds)
       : info ? lead("", m.lead) + row("What it is", m.what) + row("When we were there", entry.past.visit) + row("Best time to go", m.best) + row("Good to know", m.tips) + row("If we go again", m.again) + row("Places we saved here", (m.pins || []).join(" · "))
-      : lead("", m.why) + (p.nights && p.why && p.why !== m.why ? row("About our stay", p.why) : "") + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + row("Skip it if", m.skip, "skip");
+      : lead("", m.why) + (p.nights && p.why && p.why !== m.why ? row("About our stay", p.why) : "") + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + listRow("Nearby", m.nearby) + listRow("Breakfast nearby", m.breakfast) + row("Skip it if", m.skip, "skip");
     var foot = spots
       ? '<div class="links seg"><a class="btn" href="' + u("https://www.google.com/search?tbm=isch&q=" + q(p.name + " best photo spot")) + '" target="_blank" rel="noopener noreferrer">More example photos</a>' +
         (m.tag ? '<a class="btn" href="' + u("https://www.instagram.com/explore/tags/" + encodeURIComponent(m.tag) + "/") + '" target="_blank" rel="noopener noreferrer">#' + esc(m.tag) + ' on Instagram</a>' : "") + '</div>'
@@ -338,8 +345,9 @@
     }
 
     var stays = (h.stays || []).length ? h.stays : past ? pastStays(h, visits) : [];
+    var staysHtml = "";
     if (stays.length) {
-      html += '<section><div class="section-head"><h2>' + (past ? "Where we stayed" : "Where we stay") + '</h2><span class="eyebrow">' + (past ? "Night by night" : "And why we chose it") + '</span></div>' + staysSummary(stays, fold, past) + '<div class="stays">' +
+      staysHtml = '<div class="stays">' +
         stays.map(function (s) {
           var tm = stayTimes(s), toBook = /to book/i.test(s.nights || ""), short = !s.past && s.more;
           return '<article class="stay">' + pic({ image: s.image, vk: s.vk, wiki: s.wiki, credit: s.credit, name: s.name, type: "hotel", label: s.city, area: s.areaPhoto, decorative: true }) +
@@ -348,9 +356,9 @@
             (tm ? '<p class="stay-times">' + esc(tm) + '</p>' : "") +
             (s.why && !short ? '<p class="muted">' + esc(s.why) + '</p>' : "") +
             ((s.proof || []).length ? '<ul class="stay-proof">' + s.proof.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : "") + infoLink(s) + '<div class="card-actions">' + moreButton(s, null, s.past) + linkRow(s) + '</div></div></article>';
-        }).join("") + '</div></details></section>';
+        }).join("") + '</div>';
     }
-    if ((h.bookings || []).length) html += bookingsBox(h, fold);
+    html += glanceBox(h, fold, past, stays, staysHtml);
 
     html += '<section><div class="section-head"><h2>Day by day</h2><span class="eyebrow">Tap a day to see its trains, tips and stops</span>' +
       ((h.days || []).length > 1 ? '<button class="btn small days-all" type="button" data-h="' + esc(h.id) + '">' + (fold.days.length >= h.days.length ? "Close all days" : "Open all days") + '</button>' : "") + '</div>';
@@ -2135,19 +2143,12 @@
     var st = String(b.status || "").toLowerCase();
     return /to book|not booked|to arrange|option/.test(st) ? ["warn", st.indexOf("option") >= 0 ? "Optional" : "Still to book"] : /book|paid|confirm/.test(st) ? ["ok", "Booked"] : st ? ["", b.status] : ["", ""];
   }
-  // "Where we stay" folds like "Our bookings": the summary names the hotels, the cards open on a tap.
-  function staysSummary(stays, fold, past) {
-    var names = stays.map(function (s) { return s.name; }), todo = stays.filter(function (s) { return /to book/i.test(s.nights || ""); }).length;
-    return '<details class="tipbox fold stays-fold" data-fold="stays"' + (fold.stays ? " open" : "") + '><summary><h4><span aria-hidden="true">🏨</span> ' + stays.length + (stays.length === 1 ? " place" : " places") + (past ? ' we stayed' : ' to sleep') + (todo ? ' · ' + todo + ' still to book' : "") +
-      '<span class="fold-names">' + esc(names.slice(0, 4).join(" · ")) + (names.length > 4 ? ' +' + (names.length - 4) + ' more' : "") + '</span></h4><span class="fold-hint" aria-hidden="true"></span></summary>';
-  }
-  function bookingsBox(h, fold) {
+  // Trip at a glance: one row of tabs (where we stay, bookings, shopping, food). One panel opens at a time.
+  function bookingsList(h) {
     var list = h.bookings.slice().sort(function (a, b) { var x = String(a.date || "") + (a.time || ""), y = String(b.date || "") + (b.time || ""); return x < y ? -1 : x > y ? 1 : 0; });
-    var todo = list.filter(function (b) { return (b.todo || []).length || bookingStatus(b)[1] === "Still to book"; }).length;
     function row(k, v) { return v ? '<div><dt>' + k + '</dt><dd>' + v + '</dd></div>' : ""; }
     function lines(x) { x = [].concat(x || []).filter(Boolean); return x.length ? x.length === 1 ? esc(x[0]) : '<ul>' + x.map(function (y) { return '<li>' + esc(y) + '</li>'; }).join("") + '</ul>' : ""; }
-    return '<section id="' + esc(h.id) + '-bookings"><div class="section-head"><h2>Our bookings</h2><span class="eyebrow">Everything we booked, in date order</span></div>' +
-      '<details class="tipbox fold bookings" data-fold="bookings"' + (fold.bookings ? " open" : "") + '><summary><h4><span aria-hidden="true">🧾</span> ' + list.length + (list.length === 1 ? " booking" : " bookings") + (todo ? ' · ' + todo + ' with something to do' : "") + '</h4><span class="fold-hint" aria-hidden="true"></span></summary><div class="book-list">' +
+    return '<div class="book-list">' +
       list.map(function (b) {
         var st = bookingStatus(b), c = b.contact || {};
         var when = (b.date ? nice(b.date, true) : "") + (b.time ? " · " + b.time : "");
@@ -2157,7 +2158,42 @@
           row("Details", lines(b.details)) + row("Where", lines(b.where)) + row("Booked with", lines(b.by)) + row("Booking no. ends", lines(b.ref)) + row("Contact", contact) +
           row("Good to know", lines(b.rules)) + row("They told us", lines(b.replies)) + row("Still to do", lines(b.todo)) + row("Confirmation", lines(b.find)) +
           '</dl></article>';
-      }).join("") + '</div></details></section>';
+      }).join("") + '</div>';
+  }
+  function bookingsToDo(h) { return (h.bookings || []).filter(function (b) { return (b.todo || []).length || bookingStatus(b)[1] === "Still to book"; }).length; }
+  function venueList(h, type, past) {
+    var out = "", n = 0;
+    (h.days || []).forEach(function (d, i) {
+      var ps = (d.places || []).filter(function (p) { return p.type === type; }); if (!ps.length) return;
+      var dd = parseDate(d.date);
+      out += '<div class="venue-day"><a class="venue-daylink" data-h="' + esc(h.id) + '" data-day="' + (i + 1) + '" href="#' + esc(h.id) + '-day' + (i + 1) + '">Day ' + (i + 1) + ' · ' + WD[dd.getDay()] + ' ' + dd.getDate() + ' ' + MON[dd.getMonth()] + (d.city ? ' · ' + esc(d.city) : "") + '</a><ul>' +
+        ps.map(function (p) { n++; return '<li><div class="venue-top"><b>' + esc(p.name) + '</b>' + (p.time ? '<span class="time">' + esc(p.time) + '</span>' : "") + '</div>' + (p.note ? '<p class="note">' + esc(p.note) + '</p>' : "") + (past ? "" : moreButton(p, d.city)) + '</li>'; }).join("") + '</ul></div>';
+    });
+    return { n: n, html: out };
+  }
+  function glanceBox(h, fold, past, stays, staysHtml) {
+    var tabs = [];
+    if (stays.length) { var sb = stays.filter(function (s) { return /to book/i.test(s.nights || ""); }).length;
+      tabs.push({ k: "stays", icon: "🏨", label: past ? "Where we stayed" : "Where we stay", sub: stays.length + (stays.length === 1 ? " place" : " places") + (sb ? " · " + sb + " to book" : ""), html: staysHtml }); }
+    if ((h.bookings || []).length) { var td = bookingsToDo(h);
+      tabs.push({ k: "bookings", icon: "🧾", label: "Our bookings", sub: h.bookings.length + (h.bookings.length === 1 ? " item" : " items") + " · " + (td ? td + " to do" : "all done"), html: bookingsList(h) }); }
+    [["shopping", "🛍️", "Shopping"], ["food", "🍜", "Food"]].forEach(function (t) {
+      var v = venueList(h, t[0], past); if (v.n) tabs.push({ k: t[0], icon: t[1], label: t[2], sub: v.n + (v.n === 1 ? " place" : " places"), html: '<div class="venues">' + v.html + '</div>' });
+    });
+    if (!tabs.length) return "";
+    var open = fold.glance || "";
+    return '<section class="glance" id="' + esc(h.id) + '-glance"><div class="section-head"><h2>Trip at a glance</h2><span class="eyebrow">Open a card for details</span></div>' +
+      '<div class="glance-tabs" data-h="' + esc(h.id) + '">' + tabs.map(function (t) {
+        var id = h.id + "-g-" + t.k;
+        return '<button class="glance-tab" type="button" data-panel="' + t.k + '" aria-expanded="' + (open === t.k) + '" aria-controls="' + esc(id) + '"><span class="g-icon" aria-hidden="true">' + t.icon + '</span><span class="g-label">' + esc(t.label) + '</span><span class="g-sub">' + esc(t.sub) + '</span></button>';
+      }).join("") + '</div>' +
+      tabs.map(function (t) { var id = h.id + "-g-" + t.k; return '<div class="glance-panel" id="' + esc(id) + '" data-panel="' + t.k + '" role="region" aria-label="' + esc(t.label) + '"' + (open === t.k ? "" : " hidden") + '>' + t.html + '<p class="glance-end"><button class="btn small glance-close" type="button" data-panel="' + t.k + '">Close ' + esc(t.label) + ' <span aria-hidden="true">▲</span></button></p></div>'; }).join("") + '</section>';
+  }
+  function glanceClick(b) {
+    var row = b.closest(".glance-tabs"), sec = b.closest(".glance"), k = b.dataset.panel, was = b.getAttribute("aria-expanded") === "true";
+    row.querySelectorAll(".glance-tab").forEach(function (x) { x.setAttribute("aria-expanded", String(!was && x === b)); });
+    sec.querySelectorAll(".glance-panel").forEach(function (p) { p.hidden = was || p.dataset.panel !== k; });
+    var f = foldMem[row.dataset.h]; if (f) { f.glance = was ? "" : k; foldSave(row.dataset.h); }
   }
 
   // ---------- folding ----------
@@ -2179,8 +2215,8 @@
   function foldRead(id) {
     var f = foldMem[id]; if (!f) return;
     f.days = [].map.call(document.querySelectorAll('details.day[data-h="' + id + '"][open]'), function (d) { return +d.dataset.day; });
-    var t = document.querySelector('details[data-fold="tips"]'), k = document.querySelector('details[data-fold="keeper"]'), bk = document.querySelector('details[data-fold="bookings"]'), sf = document.querySelector('details[data-fold="stays"]');
-    if (t) f.tips = t.open; if (k) f.keeper = k.open; if (bk) f.bookings = bk.open; if (sf) f.stays = sf.open;
+    var t = document.querySelector('details[data-fold="tips"]'), k = document.querySelector('details[data-fold="keeper"]');
+    if (t) f.tips = t.open; if (k) f.keeper = k.open;
     foldSave(id);
     var all = document.querySelector(".days-all"), n = document.querySelectorAll('details.day[data-h="' + id + '"]').length;
     if (all) all.textContent = f.days.length >= n ? "Close all days" : "Open all days";
@@ -2224,6 +2260,20 @@
     return '<details class="fold guess"><summary><span aria-hidden="true">🚆</span> Journeys, our best guess from the photos</summary>' + journeyList(list) + '</details>';
   }
   function foldClick(e) {
+    var g = e.target.closest && e.target.closest(".glance-tab");
+    if (g) { glanceClick(g); return true; }
+    var gc = e.target.closest && e.target.closest(".glance-close");
+    if (gc) {
+      var tab = gc.closest(".glance").querySelector('.glance-tab[data-panel="' + gc.dataset.panel + '"]');
+      if (tab) { glanceClick(tab); tab.focus({ preventScroll: true }); if (tab.getBoundingClientRect().top < 0) tab.scrollIntoView({ block: "center" }); }
+      return true;
+    }
+    var vl = e.target.closest && e.target.closest(".venue-daylink");
+    if (vl) {
+      e.preventDefault(); openDay(vl.dataset.h, vl.dataset.day, true);
+      var vs = document.querySelector('details.day[data-h="' + vl.dataset.h + '"][data-day="' + vl.dataset.day + '"] > summary'); if (vs) vs.focus({ preventScroll: true });
+      return true;
+    }
     var c = e.target.closest && e.target.closest(".day-chip");
     if (c) { openDay(c.dataset.h, c.dataset.day, true); var cs = document.querySelector('details.day[data-h="' + c.dataset.h + '"][data-day="' + c.dataset.day + '"] > summary'); if (cs) cs.focus({ preventScroll: true }); return true; }
     var a = e.target.closest && e.target.closest(".days-all");

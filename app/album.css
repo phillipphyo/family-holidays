@@ -771,7 +771,6 @@ details.keeper .tipbox, details.keeper .plan-box { margin-top: 12px; }
 .ticket .stub.has-photo .d, .ticket .stub.has-photo .big { text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 @media (max-width: 560px) { .ticket .stub.has-photo { min-height: 96px; align-items: flex-end; } }
 /* Our bookings: one card per booking inside a fold. */
-.tipbox.bookings { max-width: none; }
 .book-list { display: grid; gap: 12px; align-items: start; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); margin-top: 4px; }
 .book { border: 1px solid var(--hair); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; background: var(--surface); }
 .book.has-todo { border-left: 4px solid #d97706; }
@@ -784,7 +783,26 @@ details.keeper .tipbox, details.keeper .plan-box { margin-top: 12px; }
 .book dd { margin: 0; overflow-wrap: anywhere; }
 .book dd ul { margin: 0; padding-left: 18px; }
 .book dd a { color: var(--indigo); }
-/* Where we stay, folded like Our bookings. */
-.tipbox.stays-fold { max-width: none; }
-.stays-fold .stays { margin-top: 6px; }
-.fold-names { display: block; font: 400 13px/1.4 var(--body); color: var(--muted); margin-top: 2px; }
+/* Trip at a glance: a row of tab cards; one panel opens below. */
+.glance-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); grid-auto-rows: 1fr; gap: 10px; }
+.glance-tab { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; text-align: left; min-height: 64px; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--hair); background: var(--surface); box-shadow: var(--shadow); color: var(--ink); font: inherit; cursor: pointer; position: relative; }
+.glance-tab .g-icon { grid-row: 1 / 3; font-size: 24px; line-height: 1; }
+.glance-tab .g-label { font-weight: 700; font-size: 15px; }
+.glance-tab .g-sub { font-size: 13px; color: var(--muted); }
+.glance-tab[aria-expanded="true"] { border-color: var(--indigo); box-shadow: 0 0 0 2px var(--indigo) inset, var(--shadow); }
+.glance-tab[aria-expanded="true"]::after { content: ""; position: absolute; left: 50%; bottom: -8px; width: 12px; height: 12px; background: var(--surface); border-right: 2px solid var(--indigo); border-bottom: 2px solid var(--indigo); transform: translateX(-50%) rotate(45deg); }
+.glance-panel { margin-top: 14px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; border-top: 3px solid var(--indigo); }
+.glance-panel .stays { gap: 16px; }
+.venues { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); align-items: start; }
+.venue-day { border: 1px solid var(--hair); border-radius: 12px; padding: 12px 14px; }
+.venue-daylink { font: 700 12px/1.3 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--indigo); text-decoration: none; display: inline-flex; min-height: 32px; align-items: center; }
+.venue-daylink:hover { text-decoration: underline; }
+.venue-day ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 12px; }
+.venue-top { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.venue-top .time { font: 500 12px/1.3 var(--mono); color: var(--muted); }
+.venue-day .note { margin: 2px 0 4px; font-size: 14px; color: var(--muted); }
+@media (max-width: 560px) { .glance-tabs { grid-template-columns: 1fr 1fr; } .glance-panel { padding: 12px; } .glance-tab[aria-expanded="true"]::after { display: none; } }
+.more-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.more-list .pin-link { color: var(--indigo); font-size: 13px; white-space: nowrap; }
+.glance-end { margin: 14px 0 0; text-align: center; }
+.glance-close { min-height: 44px; }
