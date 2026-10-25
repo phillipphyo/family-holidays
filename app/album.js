@@ -311,7 +311,7 @@
       ((h.memories || []).length ? '<div><span class="eyebrow">Photos</span><b>' + h.memories.length + '</b></div>' : "") + '</div>' +
       (h.walkingTotal ? '<p class="muted walk-total">' + esc(h.walkingTotal) + '</p>' : "") +
       ((h.journeyTips || []).length ? '<div class="tipbox"><h4><span aria-hidden="true">🚆</span> Getting around, every day</h4><ul>' + h.journeyTips.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>' +
-        (h.journeyNote ? '<p class="muted">' + esc(h.journeyNote) + '</p>' : "") + '</div>' : "") + (past ? infoBox(h) : "") + quickBox(h) +
+        (h.journeyNote ? '<p class="muted">' + esc(h.journeyNote) + '</p>' : "") + '</div>' : "") + (past ? infoBox(h) : planBox(h)) + quickBox(h) +
       '<div class="summary">' + (h.travellers ? '<p class="eyebrow">' + esc(h.travellers) + '</p>' : "") + (h.summary ? '<p>' + esc(h.summary) + '</p>' : "") +
       ((h.links || []).length ? '<div class="links">' + h.links.map(function (l, i) { return '<a class="btn' + (i ? "" : " primary") + '" href="' + u(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.label) + '</a>'; }).join("") + '</div>' : "") + '</div>';
 
@@ -1871,11 +1871,14 @@
         if (mm) showMore(mm);
         var ib = e.target.closest && e.target.closest(".info-copy, .info-check, .info-save, .info-list");
         if (ib) infoClick(ib);
+        var pb = e.target.closest && e.target.closest(".plan-save");
+        if (pb && !pb.disabled) planSave(pb);
         var qg = e.target.closest && e.target.closest(".quick-go");
         if (qg && !qg.disabled) quickGo(qg);
         var sp = e.target.closest && e.target.closest(".place-photos");
         if (sp) openStopPhotos(sp);
       });
+      document.addEventListener("change", function (e) { if (e.target.classList && e.target.classList.contains("plan-file")) planPick(e.target); });
     }
     render();
   }
@@ -2086,6 +2089,51 @@
     var h = holidays.filter(function (x) { return x.id === b.dataset.h; })[0], v = h && visitsFor(h)[b.dataset.k];
     var m = v && v.mems.filter(function (x) { return x.kind !== "video"; })[0];
     if (m) openPhotoMem(m, b);
+  }
+
+  // ---------- update a plan from a file ----------
+  // Claude sends a new plan as a plain .json file. This box locks it with the passkey you unlocked with
+  // and saves it as holidays/<id>.js, so the plan never sits unlocked on the website.
+  var planDraft = null;
+  function planBox(h) {
+    if (!h.days || !h.days.length) return "";
+    return '<details class="tipbox plan-box" data-h="' + esc(h.id) + '"><summary><span aria-hidden="true">✎</span> Update this plan from a file Claude made</summary>' +
+      '<ol class="info-steps"><li><label for="plan-file-' + esc(h.id) + '">Pick the plan file (it ends in <code>.plan.json</code>)</label> <input type="file" class="plan-file" id="plan-file-' + esc(h.id) + '" accept=".json,application/json"></li>' +
+      '<li><button class="btn small plan-save" type="button" disabled>Lock it and save</button> Save it in the website\'s <code>holidays</code> folder, replacing <code>' + esc(h.id) + '.js</code>.</li></ol>' +
+      '<p class="tag plan-msg" role="status" aria-live="polite"></p></details>';
+  }
+  function planPick(input) {
+    var box = input.closest(".plan-box"), msg = box.querySelector(".plan-msg"), btn = box.querySelector(".plan-save"), id = box.dataset.h;
+    planDraft = null; btn.disabled = true;
+    var f = input.files && input.files[0]; if (!f) return;
+    f.text().then(function (t) {
+      var h = JSON.parse(t);
+      if (!h || h.id !== id || !Array.isArray(h.days) || !h.days.length) throw new Error("This file is for a different trip, or it is not a plan file.");
+      var stops = 0; h.days.forEach(function (d) { stops += (d.places || []).length; });
+      planDraft = h; btn.disabled = false;
+      msg.textContent = "Ready: " + h.title + ", " + niceShort(h.start) + " to " + niceShort(h.end) + ", " + h.days.length + " days, " + stops + " stops, " + (h.stays || []).length + " hotels. Press Lock it and save.";
+    }).catch(function (e) { msg.textContent = "That file can't be used. " + (e && e.message && !/JSON/.test(e.message) ? e.message : "It is not a plan file from Claude."); });
+  }
+  function planSave(btn) {
+    var box = btn.closest(".plan-box"), msg = box.querySelector(".plan-msg"), h = planDraft;
+    if (!h || !unlockedKey) { msg.textContent = "Lock the album and open it again with the passkey, then try again."; return; }
+    btn.disabled = true; msg.textContent = "Locking…";
+    lockHoliday(h, unlockedKey).then(function (lockedBox) {
+      var text = "/* Locked holiday file. Open the album and enter the passkey to see it. */\nHolidayAlbum.addLocked(" + JSON.stringify(lockedBox) + ");\n", name = h.id + ".js";
+      var done = function (how) {
+        msg.textContent = how + " Then tell Claude \"plan saved\".";
+        holidays = holidays.filter(function (x) { return x.id !== h.id; }); HolidayAlbum.add(h); var keep = msg.textContent; render(); var m2 = document.querySelector(".plan-box .plan-msg"); if (m2) { m2.textContent = keep; m2.closest("details").open = true; }
+      };
+      if (window.showDirectoryPicker) {
+        return window.showDirectoryPicker({ id: "holidays", mode: "readwrite" }).then(function (dir) {
+          return dir.getFileHandle(name, { create: true }).then(function (fh) { return fh.createWritable(); }).then(function (w) { return w.write(text).then(function () { return w.close(); }); });
+        }).then(function () { done("Saved " + name + " in the folder you picked."); }, function (e) {
+          if (e && e.name === "AbortError") { btn.disabled = false; msg.textContent = "Nothing saved. Press Lock it and save again and pick the holidays folder."; return; }
+          giveFile(name, text); done("Downloaded " + name + ". Move it into the holidays folder, replacing the old one.");
+        });
+      }
+      giveFile(name, text); done("Downloaded " + name + ". Move it into the holidays folder, replacing the old one.");
+    }).catch(function () { btn.disabled = false; msg.textContent = "Locking didn't work. Try again."; });
   }
 
   // ---------- small and full photo files ----------
