@@ -228,6 +228,15 @@
         }).join("") + '</ul></details>';
       }).join("") + '</div>';
     };
+    // Sample food photos (free-licensed), each with its own photographer and licence credit.
+    var foodRow = function (label, list) {
+      list = (list || []).filter(function (x) { return x && x.name && x.image; }); if (!list.length) return "";
+      return '<div class="more-row"><h3 class="more-label">' + label + '</h3><div class="food-strip">' + list.map(function (x) {
+        var cr = x.credit || {};
+        return '<figure class="food-pic"><img src="' + u(x.image) + '" alt="' + esc(x.name) + '" loading="lazy" decoding="async"><figcaption><b>' + esc(x.name) + '</b>' +
+          (cr.url ? '<a class="credit food-credit" href="' + u(cr.url) + '" target="_blank" rel="noopener noreferrer">' + esc(creditText(cr)) + '</a>' : "") + '</figcaption></figure>';
+      }).join("") + '</div></div>';
+    };
     var row = function (label, text, cls) { return text ? '<div class="more-row' + (cls ? " " + cls : "") + '"><h3 class="more-label">' + label + '</h3><p>' + esc(text) + '</p></div>' : ""; };
     // A hotel shows a photo here only when it is the hotel itself, never an area view.
     var img = "", cr = null;
@@ -245,7 +254,7 @@
     var body = spots
       ? lead("Where to stand", m.spots) + row("Poses to try", m.poses) + row("Camera angle", m.angles) + row("Best light", m.light) + row("Beat the crowds", m.crowds)
       : info ? lead("", m.lead) + row("What it is", m.what) + row("When we were there", entry.past.visit) + row("Best time to go", m.best) + row("Good to know", m.tips) + row("If we go again", m.again) + row("Places we saved here", (m.pins || []).join(" · "))
-      : lead("", m.why) + (p.nights && p.why && p.why !== m.why ? row("About our stay", p.why) : "") + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + shopRow("Shops: Saturday hours, pay and prices", m.shops) + phraseRow(m.phrasesTitle || "Ordering card: show this to the staff", m.phrases) + listRow("Nearby", m.nearby) + listRow("Breakfast nearby", m.breakfast) + row("Skip it if", m.skip, "skip");
+      : lead("", m.why) + (p.nights && p.why && p.why !== m.why ? row("About our stay", p.why) : "") + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + shopRow("Shops: Saturday hours, pay and prices", m.shops) + foodRow("What the food looks like", m.foodPhotos) + phraseRow(m.phrasesTitle || "Ordering card: show this to the staff", m.phrases) + listRow("Nearby", m.nearby) + listRow("Breakfast nearby", m.breakfast) + row("Skip it if", m.skip, "skip");
     var foot = spots
       ? '<div class="links seg"><a class="btn" href="' + u("https://www.google.com/search?tbm=isch&q=" + q(p.name + " best photo spot")) + '" target="_blank" rel="noopener noreferrer">More example photos</a>' +
         (m.tag ? '<a class="btn" href="' + u("https://www.instagram.com/explore/tags/" + encodeURIComponent(m.tag) + "/") + '" target="_blank" rel="noopener noreferrer">#' + esc(m.tag) + ' on Instagram</a>' : "") + '</div>'
