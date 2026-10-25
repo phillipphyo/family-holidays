@@ -2141,6 +2141,7 @@
   function mailLink(m) { return /^[\w.+\-]+@[\w\-]+(\.[\w\-]+)+$/.test(m) ? '<a href="mailto:' + esc(m) + '">' + esc(m) + '</a>' : esc(m); }
   function bookingStatus(b) {
     var st = String(b.status || "").toLowerCase();
+    if (/pending|decide/.test(st)) return ["decide", "Pending decision"];
     return /to book|not booked|to arrange|option/.test(st) ? ["warn", st.indexOf("option") >= 0 ? "Optional" : "Still to book"] : /book|paid|confirm/.test(st) ? ["ok", "Booked"] : st ? ["", b.status] : ["", ""];
   }
   // Trip at a glance: one row of tabs (where we stay, bookings, shopping, food). One panel opens at a time.
@@ -2160,6 +2161,26 @@
           '</dl></article>';
       }).join("") + '</div>';
   }
+  // Pending decisions: each open choice with its options side by side, the one we recommend marked,
+  // and everything needed to decide (times, prices, why, what it changes, links).
+  function linkList(ls) { ls = [].concat(ls || []).filter(function (l) { return l && /^https:\/\//i.test(l.url || ""); }); return ls.length ? '<p class="dec-links">' + ls.map(function (l) { return '<a href="' + esc(safeUrl(l.url)) + '" target="_blank" rel="noopener">' + esc(l.label || "Link") + ' ↗</a>'; }).join("") + '</p>' : ""; }
+  function decisionsList(h) {
+    function lines(x) { x = [].concat(x || []).filter(Boolean); return x.length ? '<ul>' + x.map(function (y) { return '<li>' + esc(y) + '</li>'; }).join("") + '</ul>' : ""; }
+    return '<p class="dec-intro">Nothing here is booked yet. Each card shows the choices, what each one changes, and the one we recommend. Tell Claude your pick and the plan is updated.</p><div class="dec-list">' +
+      h.decisions.map(function (q) {
+        return '<article class="dec"><div class="book-top"><span class="book-when">' + esc(q.when || "") + '</span><span class="stay-status decide">Pending decision</span></div>' +
+          '<h3>' + esc(q.q || "") + '</h3>' + (q.context ? '<p class="dec-context">' + esc(q.context) + '</p>' : "") +
+          '<ol class="dec-options">' + (q.options || []).map(function (o) {
+            return '<li class="dec-opt' + (o.rec ? " rec" : "") + '"><div class="dec-opt-top"><b>' + esc(o.label || "") + '</b>' + (o.rec ? '<span class="dec-rec">Recommended</span>' : "") + '</div>' +
+              (o.when ? '<p class="dec-meta">🕒 ' + esc(o.when) + '</p>' : "") + (o.cost ? '<p class="dec-meta">💴 ' + esc(o.cost) + '</p>' : "") +
+              lines(o.details) + (o.changes ? '<p class="dec-changes"><b>What it changes:</b> ' + esc(o.changes) + '</p>' : "") + linkList(o.links) + '</li>';
+          }).join("") + '</ol>' +
+          (q.why ? '<p class="dec-why"><b>Why we recommend it:</b> ' + esc(q.why) + '</p>' : "") +
+          (q.deadline ? '<p class="dec-deadline"><b>Decide by:</b> ' + esc(q.deadline) + '</p>' : "") +
+          ([].concat(q.unconfirmed || []).length ? '<div class="dec-unc"><b>Not confirmed yet</b>' + lines(q.unconfirmed) + '</div>' : "") +
+          linkList(q.links) + '</article>';
+      }).join("") + '</div>';
+  }
   function bookingsToDo(h) { return (h.bookings || []).filter(function (b) { return (b.todo || []).length || bookingStatus(b)[1] === "Still to book"; }).length; }
   function venueList(h, type, past) {
     var out = "", n = 0;
@@ -2173,6 +2194,7 @@
   }
   function glanceBox(h, fold, past, stays, staysHtml) {
     var tabs = [];
+    if (!past && (h.decisions || []).length) tabs.push({ k: "decisions", icon: "🤔", label: "Pending decisions", sub: h.decisions.length + (h.decisions.length === 1 ? " choice" : " choices") + " to make", html: decisionsList(h) });
     if (stays.length) { var sb = stays.filter(function (s) { return /to book/i.test(s.nights || ""); }).length;
       tabs.push({ k: "stays", icon: "🏨", label: past ? "Where we stayed" : "Where we stay", sub: stays.length + (stays.length === 1 ? " place" : " places") + (sb ? " · " + sb + " to book" : ""), html: staysHtml }); }
     if ((h.bookings || []).length) { var td = bookingsToDo(h);

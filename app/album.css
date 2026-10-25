@@ -806,3 +806,28 @@ details.keeper .tipbox, details.keeper .plan-box { margin-top: 12px; }
 .more-list .pin-link { color: var(--indigo); font-size: 13px; white-space: nowrap; }
 .glance-end { margin: 14px 0 0; text-align: center; }
 .glance-close { min-height: 44px; }
+
+/* Pending decisions */
+.stay-status.decide { background: color-mix(in srgb, #7c3aed 16%, transparent); color: #5b21b6; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .stay-status.decide { color: #c9b2ff; } }
+:root[data-theme="dark"] .stay-status.decide { color: #c9b2ff; }
+.dec-intro { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+.dec-list { display: grid; gap: 14px; }
+.dec { border: 1px solid var(--hair); border-left: 4px solid #7c3aed; border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; background: var(--surface); min-width: 0; }
+.dec h3 { font-size: 17px; margin: 0; }
+.dec p { margin: 0; font-size: 14px; }
+.dec-context { color: var(--muted); }
+.dec-options { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.dec-opt { border: 1px solid var(--hair); border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; align-content: start; font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
+.dec-opt.rec { border: 2px solid #2e8b57; }
+.dec-opt-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.dec-rec { flex: none; font: 700 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 4px 6px; border-radius: 6px; background: color-mix(in srgb, #2e8b57 16%, transparent); color: #1f6b41; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dec-rec { color: #8fe0b0; } }
+:root[data-theme="dark"] .dec-rec { color: #8fe0b0; }
+.dec-opt ul, .dec-unc ul { margin: 2px 0 0; padding-left: 18px; }
+.dec-meta { color: var(--ink); }
+.dec-changes { color: var(--muted); }
+.dec-unc { font-size: 13px; color: var(--muted); }
+.dec-links { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.dec-links a { color: var(--indigo); font-size: 14px; }
+@media (max-width: 560px) { .glance-tab[data-panel="decisions"] { grid-column: 1 / -1; } }
