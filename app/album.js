@@ -502,13 +502,14 @@
   }
   function dayFloatUpdate() {
     var b = document.getElementById("day-float-close"); if (!b) return;
-    var cur = null;
+    // Measure against the bottom of the sticky top bar, not the top of the window.
+    var cur = null, bar = document.querySelector(".bar"), top = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
     [].forEach.call(document.querySelectorAll("details.day[open]"), function (d) {
       var s = d.querySelector(":scope > summary"); if (!s) return;
-      if (s.getBoundingClientRect().bottom < 0 && d.getBoundingClientRect().bottom > 0) cur = d;
+      if (s.getBoundingClientRect().bottom < top && d.getBoundingClientRect().bottom > top) cur = d;
     });
     dayFloatDay = cur;
-    b.hidden = !cur;
+    if (b.hidden !== !cur) b.hidden = !cur;
   }
   function dayFloatSetup() {
     if (dayIO) { dayIO.disconnect(); dayIO = null; }
@@ -2734,7 +2735,7 @@
     if (dayN) { var dEl = document.getElementById(id + "-day" + dayN); if (dEl) dEl.scrollIntoView({ block: "start" }); }
     else window.scrollTo(0, 0);
     dayFloatSetup();
-    document.title =(h ? h.title + " · " : id === "rebuild" ? "Add your photos · " : "") + "Family Holiday Album";
+    document.title = (h ? h.title + " · " : id === "rebuild" ? "Add your photos · " : "") + "Family Holiday Album";
   }
 
   window.HolidayAlbum = {

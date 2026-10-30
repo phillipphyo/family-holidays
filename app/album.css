@@ -286,7 +286,7 @@ footer.wrap::before { content: ""; position: absolute; left: 0; right: 0; top: 0
 @media (min-width: 900px) { .journeys ul.ifwrong { grid-template-columns: 1fr; } }
 /* Floating "Close this day": bottom-centre on phones, bottom-right on wider screens. */
 .day-float-close { position: fixed; z-index: 15; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  min-height: 44px; min-width: 44px; padding: 10px 18px; border: 0; border-radius: 999px; cursor: pointer;
+  min-height: 44px; min-width: 44px; padding: 10px 18px; border: 2px solid transparent; border-radius: 999px; cursor: pointer;
   background: var(--indigo); color: var(--on-indigo); font: 700 14px/1.2 var(--body); box-shadow: var(--shadow-lg); }
 .day-float-close[hidden] { display: none; }
 .day-float-close span { margin-left: 6px; }
