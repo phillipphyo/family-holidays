@@ -919,3 +919,5 @@ ul.pts-sub { margin-top: 4px; gap: 3px; }
 .journeys ol.journey-steps:has(.step, .has-thumb) > li.has-thumb::before { line-height: 54px; }
 .journeys ol.journey-steps:has(.step, .has-thumb) > li > .step { flex: 1; min-width: 0; }
 @media (min-width: 700px) { .journeys ol.journey-steps:has(.step, .has-thumb) > li.has-thumb::before { line-height: 72px; } }
+.journeys ul.step-more, .journeys ul.pts-sub, .journeys .ifwrong-fold ul.ifwrong { grid-template-columns: 1fr; }
+@media (max-width: 699px) { .journeys .step > summary::after { content: "▾"; font-size: 16px; } .journeys .step[open] > summary::after { content: "▴"; } }
