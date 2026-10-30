@@ -52,6 +52,7 @@
   // One entry of a list (trip tips, booking lines): a point, or a list whose first point heads its sub-points.
   function ptItem(y) { if (Array.isArray(y)) { y = ptList(y); return y.length ? ptHtml(y[0]) + pts(y.slice(1), "pts-sub") : ""; } return y == null ? "" : ptHtml(String(y)); }
   // cls and id are fixed names written in this file, never data.
+  function hasPt(y) { return Array.isArray(y) ? ptList(y).length > 0 : y != null && String(y).trim() !== ""; }
   function pts(x, cls, id) {
     var list = Array.isArray(x), names = [cls, list ? "pts" : ""].filter(Boolean).join(" ");
     var at = (names ? ' class="' + names + '"' : "") + (id ? ' id="' + id + '"' : "");
@@ -498,16 +499,18 @@
     list = asList(list);
     ifWrong = (Array.isArray(ifWrong) ? ifWrong : ifWrong ? [ifWrong] : []).filter(function (j) { return typeof j === "string" ? !!j : ptList(j).length; });
     if (!list.length && !ifWrong.length) return "";
+    // In a list with pictures or folds, each row's content sits in one wrapper beside its number.
+    var rich = list.some(function (j) { return typeof j !== "string"; });
     function item(j) {
       if (typeof j !== "string") return step(j);
-      var i = j.indexOf(": ");
-      return '<li>' + (i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j)) + '</li>';
+      var i = j.indexOf(": "), t = i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j);
+      return '<li>' + (rich ? '<span class="step-body">' + t + '</span>' : t) + '</li>';
     }
     function step(j) {
-      var more = ptList(j.more), sp = stepPic(j, places, photos), im = thumb(sp);
+      var more = ptList(typeof j.more === "string" ? [j.more] : j.more), sp = stepPic(j, places, photos), im = thumb(sp);
       var head = im + '<span class="step-sum">' + ptHtml(j.step) + '</span>';
-      var cr = im && sp.own && sp.credit && sp.credit.url ? '<a class="credit step-credit" href="' + u(sp.credit.url) + '" target="_blank" rel="noopener noreferrer">' + esc(creditText(sp.credit)) + '</a>' : "";
-      return '<li' + (im ? ' class="has-thumb"' : "") + '>' + (more.length ? '<details class="step"><summary>' + head + '</summary>' + pts(more, "step-more") + cr + '</details>' : head + cr) + '</li>';
+      var c = im && sp.own && sp.credit, cr = !c ? "" : c.url ? '<a class="credit step-credit" href="' + u(c.url) + '" target="_blank" rel="noopener noreferrer">' + esc(creditText(c)) + '</a>' : '<span class="credit step-credit">' + esc(creditText(c)) + '</span>';
+      return '<li' + (im ? ' class="has-thumb"' : "") + '>' + (more.length ? '<details class="step"><summary>' + head + '</summary>' + pts(more, "step-more") + cr + '</details>' : '<div class="step-body"><div class="step-head">' + head + '</div>' + cr + '</div>') + '</li>';
     }
     return '<div class="journeys"><h4><span aria-hidden="true">🚆</span> ' + esc(title || "Journeys") + '</h4>' +
       (list.length ? '<ol class="journey-steps">' + list.map(item).join("") + '</ol>' : "") +
@@ -528,7 +531,7 @@
   function thumbSrc(p) { return p ? p.image || (p.wiki && ((window.ALBUM_IMAGES || {})[p.wiki] || wikiCache[p.wiki])) || "" : ""; }
   function thumb(p) {
     if (!thumbSrc(p)) return ""; thumbRefs.push(p);
-    var cr = p.credit && p.credit.url ? creditText(p.credit) : "";
+    var cr = p.credit && (p.credit.by || p.credit.url) ? creditText(p.credit) : "";
     return '<img class="thumb" alt="" data-thumb="' + (thumbRefs.length - 1) + '"' + (cr ? ' title="' + esc(cr) + '"' : "") + '>';
   }
   function fillThumbs(root) {
@@ -2317,7 +2320,7 @@
   function bookingsList(h) {
     var list = h.bookings.slice().sort(function (a, b) { var x = String(a.date || "") + (a.time || ""), y = String(b.date || "") + (b.time || ""); return x < y ? -1 : x > y ? 1 : 0; });
     function row(k, v) { return v ? '<div><dt>' + k + '</dt><dd>' + v + '</dd></div>' : ""; }
-    function lines(x) { x = [].concat(x || []).filter(Boolean); return x.length ? x.length === 1 ? ptItem(x[0]) : '<ul>' + x.map(function (y) { return '<li>' + ptItem(y) + '</li>'; }).join("") + '</ul>' : ""; }
+    function lines(x) { x = [].concat(x || []).filter(hasPt); return x.length ? x.length === 1 ? ptItem(x[0]) : '<ul>' + x.map(function (y) { return '<li>' + ptItem(y) + '</li>'; }).join("") + '</ul>' : ""; }
     return '<div class="book-list">' +
       list.map(function (b) {
         var st = bookingStatus(b), c = b.contact || {};
@@ -2334,7 +2337,7 @@
   // and everything needed to decide (times, prices, why, what it changes, links).
   function linkList(ls) { ls = [].concat(ls || []).filter(function (l) { return l && /^https:\/\//i.test(l.url || ""); }); return ls.length ? '<p class="dec-links">' + ls.map(function (l) { return '<a href="' + esc(safeUrl(l.url)) + '" target="_blank" rel="noopener">' + esc(l.label || "Link") + ' ↗</a>'; }).join("") + '</p>' : ""; }
   function decisionsList(h) {
-    function lines(x) { x = [].concat(x || []).filter(Boolean); return x.length ? '<ul>' + x.map(function (y) { return '<li>' + ptItem(y) + '</li>'; }).join("") + '</ul>' : ""; }
+    function lines(x) { x = [].concat(x || []).filter(hasPt); return x.length ? '<ul>' + x.map(function (y) { return '<li>' + ptItem(y) + '</li>'; }).join("") + '</ul>' : ""; }
     // A labelled paragraph, or the label above a list of points.
     function labelled(cls, label, x) { return !txt(x) ? "" : Array.isArray(x) ? '<div class="' + cls + '"><b>' + label + '</b>' + pts(x) + '</div>' : '<p class="' + cls + '"><b>' + label + '</b> ' + esc(x) + '</p>'; }
     return '<p class="dec-intro">Nothing here is booked yet. Each card shows the choices, what each one changes, and the one we recommend. Tell Claude your pick and the plan is updated.</p><div class="dec-list">' +
@@ -2781,7 +2784,7 @@
     mergeParts(); applyV2(); tagV2(); mergeInfo();
     var root = document.getElementById("app");
     var h = holidays.filter(function (x) { return x.id === id; })[0];
-    moreList = [];
+    moreList = []; thumbRefs = [];
     if (id === "rebuild") { root.innerHTML = rebuildView(); wireRebuild(root); }
     else if (h) {
       root.innerHTML = holidayView(h);
