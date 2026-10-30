@@ -911,3 +911,11 @@ ul.pts-sub { margin-top: 4px; gap: 3px; }
 .stops-fold .pin-link { margin-left: 8px; color: var(--indigo); white-space: nowrap; }
 @media (min-width: 700px) { .thumb { width: 96px; height: 72px; } }
 @media print { .thumb { display: none; } }
+/* Numbers for picture-led steps sit beside the photo, not under it. */
+.journeys ol.journey-steps:has(.step, .has-thumb) { list-style: none; padding-left: 0; counter-reset: jstep; }
+.journeys ol.journey-steps:has(.step, .has-thumb) > li { counter-increment: jstep; display: flex; align-items: flex-start; gap: 6px; }
+.journeys ol.journey-steps:has(.step, .has-thumb) > li::before { content: counter(jstep) "."; flex: none; min-width: 1.6em; font-weight: 700; color: var(--indigo); line-height: 1.5; }
+.journeys ol.journey-steps:has(.step, .has-thumb) > li:has(> .step)::before { line-height: 44px; }
+.journeys ol.journey-steps:has(.step, .has-thumb) > li.has-thumb::before { line-height: 54px; }
+.journeys ol.journey-steps:has(.step, .has-thumb) > li > .step { flex: 1; min-width: 0; }
+@media (min-width: 700px) { .journeys ol.journey-steps:has(.step, .has-thumb) > li.has-thumb::before { line-height: 72px; } }
