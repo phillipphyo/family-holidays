@@ -423,7 +423,7 @@
         (past ? (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") : stopsList(d, route)) +
         pts(d.travel, "travel") +
         (d.walk || d.ifTired ? '<div class="walk">' + (d.walk ? '<span><b>Walking</b> ' + esc(d.walk) + '</span>' : "") + (d.ifTired ? '<span><b>If tired</b> ' + esc(d.ifTired) + '</span>' : "") + '</div>' : "") +
-        (past && !(d.journeys || []).length ? guessJourneys(likelyJourneys(h, i)) : journeyList(d.journeys, "", d.journeysIfWrong, d.places)) +
+        (past && !(d.journeys || []).length ? guessJourneys(likelyJourneys(h, i)) : journeyList(d.journeys, "", d.journeysIfWrong, d.places, h.stepPhotos)) +
         pickupList(d.pickups) +
         '</div>';
       var shots = {};
@@ -492,7 +492,7 @@
   // A day's journeys: numbered steps in travel order. A step is either one line, or a short summary line
   // with its detail folded underneath (tap to open) and, where the plan has a photo of that place, a small picture.
   // "If something goes wrong" is folded too, so the day reads as steps first.
-  function journeyList(list, title, ifWrong, places) {
+  function journeyList(list, title, ifWrong, places, photos) {
     function isStep(j) { return typeof j === "string" ? !!j : !!(j && typeof j === "object" && !Array.isArray(j) && typeof j.step === "string" && j.step); }
     function asList(x) { return (Array.isArray(x) ? x : x ? [x] : []).filter(isStep); }
     list = asList(list);
@@ -504,9 +504,9 @@
       return '<li>' + (i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j)) + '</li>';
     }
     function step(j) {
-      var more = ptList(j.more), im = thumb(stepPic(j, places));
+      var more = ptList(j.more), sp = stepPic(j, places, photos), im = thumb(sp);
       var head = im + '<span class="step-sum">' + ptHtml(j.step) + '</span>';
-      var cr = j.image && j.credit && j.credit.url ? '<a class="credit step-credit" href="' + u(j.credit.url) + '" target="_blank" rel="noopener noreferrer">' + esc(creditText(j.credit)) + '</a>' : "";
+      var cr = im && sp.own && sp.credit && sp.credit.url ? '<a class="credit step-credit" href="' + u(sp.credit.url) + '" target="_blank" rel="noopener noreferrer">' + esc(creditText(sp.credit)) + '</a>' : "";
       return '<li' + (im ? ' class="has-thumb"' : "") + '>' + (more.length ? '<details class="step"><summary>' + head + '</summary>' + pts(more, "step-more") + cr + '</details>' : head + cr) + '</li>';
     }
     return '<div class="journeys"><h4><span aria-hidden="true">🚆</span> ' + esc(title || "Journeys") + '</h4>' +
@@ -515,9 +515,11 @@
         ifWrong.map(function (j) { return '<li>' + ptItem(j) + '</li>'; }).join("") + '</ul></details>' : "") +
       '</div>';
   }
-  // A step's picture: its own small photo (with credit), or the photo of a place of that day named in "pic".
-  function stepPic(j, places) {
-    if (j.image) return { image: j.image, credit: j.credit };
+  // A step's picture: one of the trip's step photos named in "photo" (each kept once, with its credit),
+  // or the photo of a place of that day named in "pic" (credited on its own card).
+  function stepPic(j, places, photos) {
+    var ph = j.photo && photos && Object.prototype.hasOwnProperty.call(photos, j.photo) ? photos[j.photo] : null;
+    if (ph && ph.image) return { image: ph.image, credit: ph.credit, own: true };
     return j.pic ? (places || []).filter(function (x) { return x && x.name === j.pic; })[0] || null : null;
   }
   // Small photos (today's stops, journey steps) come from the plan's own pictures, and are put in only when
