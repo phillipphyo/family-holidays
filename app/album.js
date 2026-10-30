@@ -473,11 +473,11 @@
   // Each ride as "how: time, how often, cost", with the part before the first colon in bold.
   // The rides are numbered steps in one column, in travel order; backups go under "If something goes wrong".
   function journeyList(list, title, ifWrong) {
-    list = list || [];
-    ifWrong = ifWrong || [];
+    function asList(x) { return (Array.isArray(x) ? x : x ? [x] : []).filter(function (j) { return typeof j === "string" && j; }); }
+    list = asList(list);
+    ifWrong = asList(ifWrong);
     if (!list.length && !ifWrong.length) return "";
     function item(j) {
-      j = String(j);
       var i = j.indexOf(": ");
       return '<li>' + (i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j)) + '</li>';
     }
@@ -485,6 +485,61 @@
       (list.length ? '<ol class="journey-steps">' + list.map(item).join("") + '</ol>' : "") +
       (ifWrong.length ? '<h5 class="ifwrong-h">If something goes wrong</h5><ul class="ifwrong">' + ifWrong.map(item).join("") + '</ul>' : "") +
       '</div>';
+  }
+  // A floating "Close this day" button: shown while you are inside an open day whose header has scrolled away.
+  var dayIO = null, dayFloatDay = null, dayFloatScroll = false;
+  function dayFloatBtn() {
+    var b = document.getElementById("day-float-close");
+    if (!b) {
+      b = document.createElement("button");
+      b.type = "button"; b.id = "day-float-close"; b.className = "day-float-close"; b.hidden = true;
+      b.setAttribute("aria-label", "Close this day");
+      b.innerHTML = 'Close this day <span aria-hidden="true">✕</span>';
+      b.addEventListener("click", dayFloatClose);
+      document.body.appendChild(b);
+    }
+    return b;
+  }
+  function dayFloatUpdate() {
+    var b = document.getElementById("day-float-close"); if (!b) return;
+    var cur = null;
+    [].forEach.call(document.querySelectorAll("details.day[open]"), function (d) {
+      var s = d.querySelector(":scope > summary"); if (!s) return;
+      if (s.getBoundingClientRect().bottom < 0 && d.getBoundingClientRect().bottom > 0) cur = d;
+    });
+    dayFloatDay = cur;
+    b.hidden = !cur;
+  }
+  function dayFloatSetup() {
+    if (dayIO) { dayIO.disconnect(); dayIO = null; }
+    dayFloatDay = null;
+    var days = document.querySelectorAll("details.day");
+    if (!days.length || !("IntersectionObserver" in window)) { var old = document.getElementById("day-float-close"); if (old) old.hidden = true; return; }
+    dayFloatBtn();
+    dayIO = new IntersectionObserver(dayFloatUpdate, { threshold: [0, 1] });
+    [].forEach.call(days, function (d) { dayIO.observe(d); var s = d.querySelector(":scope > summary"); if (s) dayIO.observe(s); });
+    // Backup for browsers that deliver the observer's notices late: re-check at most once per frame while scrolling.
+    if (!dayFloatScroll) {
+      dayFloatScroll = true;
+      var queued = false;
+      window.addEventListener("scroll", function () {
+        if (queued || !dayIO) return;
+        queued = true;
+        requestAnimationFrame(function () { queued = false; dayFloatUpdate(); });
+      }, { passive: true });
+    }
+    dayFloatUpdate();
+  }
+  function dayFloatClose() {
+    var day = dayFloatDay, sm = day && day.querySelector(":scope > summary");
+    if (!day || !sm) return;
+    day.open = false; foldRead(day.dataset.h);
+    var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    day.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+    // If the browser didn't animate the scroll, jump to the day's header.
+    setTimeout(function () { var t = day.getBoundingClientRect().top; if (t < -40 || t > window.innerHeight / 2) day.scrollIntoView({ block: "start" }); }, 700);
+    sm.focus({ preventScroll: true });
+    dayFloatUpdate();
   }
   // Where to catch each bus, train or taxi: a pin for each pick-up point, and a street photo where we have one.
   function pickupList(list) {
@@ -1972,6 +2027,7 @@
         var t = e.target; if (!t.matches || !t.matches("details.day, details[data-fold]")) return;
         var hid = t.dataset.h || ((document.querySelector("details.day[data-h]") || {}).dataset || {}).h;
         if (hid) foldRead(hid);
+        if (t.matches("details.day")) dayFloatUpdate();
       }, true);
     }
     render();
@@ -2677,7 +2733,8 @@
     wirePics(root);
     if (dayN) { var dEl = document.getElementById(id + "-day" + dayN); if (dEl) dEl.scrollIntoView({ block: "start" }); }
     else window.scrollTo(0, 0);
-    document.title = (h ? h.title + " · " : id === "rebuild" ? "Add your photos · " : "") + "Family Holiday Album";
+    dayFloatSetup();
+    document.title =(h ? h.title + " · " : id === "rebuild" ? "Add your photos · " : "") + "Family Holiday Album";
   }
 
   window.HolidayAlbum = {
