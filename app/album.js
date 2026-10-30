@@ -43,17 +43,19 @@
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   // Card texts are either one paragraph (a string) or a list of short points (an array of strings).
   // A point written "Label: text" shows its label in bold when the label is short (up to 4 words).
-  function ptList(x) { return (Array.isArray(x) ? x : []).filter(function (y) { return typeof y === "string" && y; }); }
-  function txt(x) { return Array.isArray(x) ? ptList(x).join(" ") : x == null ? "" : String(x); }
+  function ptList(x) { return (Array.isArray(x) ? x : []).filter(function (y) { return typeof y === "string" && y.trim(); }); }
+  function txt(x) { return Array.isArray(x) ? ptList(x).join(" ") : x ? String(x) : ""; }
   function ptHtml(s) {
     var i = s.indexOf(": "), lab = i > 0 ? s.slice(0, i) : "";
     return lab && lab.length <= 40 && lab.split(/\s+/).length <= 4 ? '<b>' + esc(lab + ":") + '</b> ' + esc(s.slice(i + 2)) : esc(s);
   }
   // One entry of a list (trip tips, booking lines): a point, or a list whose first point heads its sub-points.
-  function ptItem(y) { if (Array.isArray(y)) { y = ptList(y); return y.length ? ptHtml(y[0]) + pts(y.slice(1), "pts-sub") : ""; } return ptHtml(String(y)); }
+  function ptItem(y) { if (Array.isArray(y)) { y = ptList(y); return y.length ? ptHtml(y[0]) + pts(y.slice(1), "pts-sub") : ""; } return y == null ? "" : ptHtml(String(y)); }
+  // cls and id are fixed names written in this file, never data.
   function pts(x, cls, id) {
-    var at = (cls ? ' class="' + cls + (Array.isArray(x) ? " pts" : "") + '"' : Array.isArray(x) ? ' class="pts"' : "") + (id ? ' id="' + id + '"' : "");
-    if (Array.isArray(x)) { x = ptList(x); return x.length ? '<ul' + at + '>' + x.map(function (y) { return '<li>' + ptHtml(y) + '</li>'; }).join("") + '</ul>' : ""; }
+    var list = Array.isArray(x), names = [cls, list ? "pts" : ""].filter(Boolean).join(" ");
+    var at = (names ? ' class="' + names + '"' : "") + (id ? ' id="' + id + '"' : "");
+    if (list) { x = ptList(x); return x.length ? '<ul' + at + '>' + x.map(function (y) { return '<li>' + ptHtml(y) + '</li>'; }).join("") + '</ul>' : ""; }
     return x ? '<p' + at + '>' + esc(x) + '</p>' : "";
   }
   // Only allow web links, embedded pictures and files inside this website.
@@ -269,7 +271,7 @@
     var body = spots
       ? lead("Where to stand", m.spots) + row("Poses to try", m.poses) + row("Camera angle", m.angles) + row("Best light", m.light) + row("Beat the crowds", m.crowds)
       : info ? lead("", m.lead) + row("What it is", m.what) + row("When we were there", entry.past.visit) + row("Best time to go", m.best) + row("Good to know", m.tips) + row("If we go again", m.again) + row("Places we saved here", (m.pins || []).join(" · "))
-      : lead("", m.why) + (p.nights && p.why && p.why !== m.why ? row("About our stay", p.why) : "") + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + shopRow("Shops: Saturday hours, pay and prices", m.shops) + foodRow("What the food looks like", m.foodPhotos) + phraseRow(m.phrasesTitle || "Ordering card: show this to the staff", m.phrases) + listRow("Nearby", m.nearby) + listRow("Breakfast nearby", m.breakfast) + row("Skip it if", m.skip, "skip");
+      : lead("", m.why) + (p.nights && txt(p.why) && txt(p.why) !== txt(m.why) ? row("About our stay", p.why) : "") + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + shopRow("Shops: Saturday hours, pay and prices", m.shops) + foodRow("What the food looks like", m.foodPhotos) + phraseRow(m.phrasesTitle || "Ordering card: show this to the staff", m.phrases) + listRow("Nearby", m.nearby) + listRow("Breakfast nearby", m.breakfast) + row("Skip it if", m.skip, "skip");
     var foot = spots
       ? '<div class="links seg"><a class="btn" href="' + u("https://www.google.com/search?tbm=isch&q=" + q(p.name + " best photo spot")) + '" target="_blank" rel="noopener noreferrer">More example photos</a>' +
         (m.tag ? '<a class="btn" href="' + u("https://www.instagram.com/explore/tags/" + encodeURIComponent(m.tag) + "/") + '" target="_blank" rel="noopener noreferrer">#' + esc(m.tag) + ' on Instagram</a>' : "") + '</div>'
@@ -2395,14 +2397,14 @@
   }
   // Check-in and check-out times, taken from the hotel's own words.
   function stayTimes(s) {
-    var w = txt(s.why) + " " + txt((s.more || {}).tips), a = w.match(/check-in (?:is )?(?:from )?(\d{1,2}:\d{2})/i), b = w.match(/check-out (?:is )?(?:by )?(\d{1,2}:\d{2})/i);
+    var w = txt(s.why) + " " + txt((s.more || {}).tips), a = w.match(/check-in:? (?:is )?(?:from )?(\d{1,2}:\d{2})/i), b = w.match(/check-out:? (?:is )?(?:by )?(\d{1,2}:\d{2})/i);
     return a || b ? (a ? "Check-in " + a[1] : "") + (a && b ? " · " : "") + (b ? "Check-out " + b[1] : "") : "";
   }
   // On the first night at a hotel, the day's headline shows its check-in time.
   function checkInFor(h, stays, i) {
     var d = h.days[i], prev = h.days[i - 1]; if (!d.sleep || (prev && prev.sleep === d.sleep)) return "";
     var key = d.sleep.split(",")[0].toLowerCase(), s = (stays || []).filter(function (x) { return String(x.name).toLowerCase().indexOf(key) === 0; })[0];
-    var m = s && (txt(s.why) + " " + txt((s.more || {}).tips)).match(/check-in (?:is )?(?:from )?(\d{1,2}:\d{2})/i);
+    var m = s && (txt(s.why) + " " + txt((s.more || {}).tips)).match(/check-in:? (?:is )?(?:from )?(\d{1,2}:\d{2})/i);
     return m ? m[1] : "";
   }
   function stills(list) { return list.filter(function (m) { return m.kind !== "video"; }).length; }
