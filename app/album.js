@@ -406,7 +406,7 @@
         (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") +
         (d.travel ? '<p class="travel">' + esc(d.travel) + '</p>' : "") +
         (d.walk || d.ifTired ? '<div class="walk">' + (d.walk ? '<span><b>Walking</b> ' + esc(d.walk) + '</span>' : "") + (d.ifTired ? '<span><b>If tired</b> ' + esc(d.ifTired) + '</span>' : "") + '</div>' : "") +
-        (past && !(d.journeys || []).length ? guessJourneys(likelyJourneys(h, i)) : journeyList(d.journeys)) +
+        (past && !(d.journeys || []).length ? guessJourneys(likelyJourneys(h, i)) : journeyList(d.journeys, "", d.journeysIfWrong)) +
         pickupList(d.pickups) +
         '</div>';
       var shots = {};
@@ -471,12 +471,20 @@
             '<div class="card-actions">' + moreButton(p, d.city, { visit: visitText(d, v), pic: own, photos: "" }) + linkRow(p) + '</div></div></div>';
   }
   // Each ride as "how: time, how often, cost", with the part before the first colon in bold.
-  function journeyList(list, title) {
-    if (!(list || []).length) return "";
-    return '<div class="journeys"><h4><span aria-hidden="true">🚆</span> ' + esc(title || "Journeys") + '</h4><ul>' + list.map(function (j) {
+  // The rides are numbered steps in one column, in travel order; backups go under "If something goes wrong".
+  function journeyList(list, title, ifWrong) {
+    list = list || [];
+    ifWrong = ifWrong || [];
+    if (!list.length && !ifWrong.length) return "";
+    function item(j) {
+      j = String(j);
       var i = j.indexOf(": ");
       return '<li>' + (i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j)) + '</li>';
-    }).join("") + '</ul></div>';
+    }
+    return '<div class="journeys"><h4><span aria-hidden="true">🚆</span> ' + esc(title || "Journeys") + '</h4>' +
+      (list.length ? '<ol class="journey-steps">' + list.map(item).join("") + '</ol>' : "") +
+      (ifWrong.length ? '<h5 class="ifwrong-h">If something goes wrong</h5><ul class="ifwrong">' + ifWrong.map(item).join("") + '</ul>' : "") +
+      '</div>';
   }
   // Where to catch each bus, train or taxi: a pin for each pick-up point, and a street photo where we have one.
   function pickupList(list) {
