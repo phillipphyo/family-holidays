@@ -883,3 +883,31 @@ ul.pts-sub { margin-top: 4px; gap: 3px; }
 .dec ul.pts, .dec .dec-why, .dec .dec-changes { font-size: 14px; }
 .more-row.skip ul.pts { color: var(--muted); }
 .stay .body > ul.muted { margin-bottom: 4px; }
+/* Journey steps: a small photo and one short line; tap to open the detail. */
+.thumb { width: 72px; height: 54px; flex: none; object-fit: cover; border-radius: 8px; background: var(--line); }
+.journeys .step > summary, .journeys li.has-thumb > .step-sum { cursor: pointer; }
+.journeys .step > summary { list-style: none; display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.journeys .step > summary::-webkit-details-marker { display: none; }
+.journeys .step > summary::after { content: "Details ▾"; margin-left: auto; flex: none; font: 600 12px/1.2 var(--body); color: var(--indigo); white-space: nowrap; }
+.journeys .step[open] > summary::after { content: "Hide ▴"; }
+.journeys .step-sum { flex: 1; min-width: 0; }
+.journeys li.has-thumb:not(:has(details)) { display: list-item; }
+.journeys li.has-thumb:not(:has(details)) .thumb { float: left; margin: 0 10px 4px 0; }
+.journeys .step-more { margin: 6px 0 4px; font-size: 14px; }
+.step-credit { display: block; margin-top: 2px; font: 500 11px/1.3 var(--mono); color: var(--muted); text-decoration: none; }
+.journeys .ifwrong-fold { margin-top: 8px; }
+.journeys .ifwrong-fold > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.journeys .ifwrong-fold > summary.ifwrong-h { margin: 0; }
+.journeys .ifwrong-fold ul.ifwrong { margin-top: 4px; }
+/* Today's stops: folded list of time, name, small photo and map link. */
+.stops-fold { margin: 8px 0; }
+.stops-fold > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--indigo); }
+.stops-fold ol.stops { margin: 4px 0 0; padding-left: 24px; display: grid; gap: 8px; }
+.stops-fold ol.stops li::marker { font-weight: 700; }
+.stops-fold ol.stops li > * { vertical-align: middle; }
+.stops-fold ol.stops .thumb { width: 56px; height: 42px; margin-right: 8px; }
+.stops-fold .stop-txt { display: inline-flex; flex-direction: column; vertical-align: middle; max-width: calc(100% - 120px); }
+.stops-fold .stop-time { font: 600 12px/1.3 var(--mono); color: var(--muted); }
+.stops-fold .pin-link { margin-left: 8px; color: var(--indigo); white-space: nowrap; }
+@media (min-width: 700px) { .thumb { width: 96px; height: 72px; } }
+@media print { .thumb { display: none; } }

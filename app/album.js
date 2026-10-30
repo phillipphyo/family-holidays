@@ -420,10 +420,10 @@
         (photosN ? '<p class="day-photos"><span aria-hidden="true">📷</span> ' + photosN + (photosN === 1 ? " photo" : " photos") + '</p>' : "") +
         '<span class="day-toggle" aria-hidden="true"><span class="t-show">Show the day</span><span class="t-hide">Hide the day</span><span class="chev" aria-hidden="true"></span></span>' +
         '</div></div></summary><div class="day-body"><div class="day-info">' +
-        (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") +
+        (past ? (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") : stopsList(d, route)) +
         pts(d.travel, "travel") +
         (d.walk || d.ifTired ? '<div class="walk">' + (d.walk ? '<span><b>Walking</b> ' + esc(d.walk) + '</span>' : "") + (d.ifTired ? '<span><b>If tired</b> ' + esc(d.ifTired) + '</span>' : "") + '</div>' : "") +
-        (past && !(d.journeys || []).length ? guessJourneys(likelyJourneys(h, i)) : journeyList(d.journeys, "", d.journeysIfWrong)) +
+        (past && !(d.journeys || []).length ? guessJourneys(likelyJourneys(h, i)) : journeyList(d.journeys, "", d.journeysIfWrong, d.places)) +
         pickupList(d.pickups) +
         '</div>';
       var shots = {};
@@ -489,19 +489,61 @@
   }
   // Each ride as "how: time, how often, cost", with the part before the first colon in bold.
   // The rides are numbered steps in one column, in travel order; backups go under "If something goes wrong".
-  function journeyList(list, title, ifWrong) {
-    function asList(x) { return (Array.isArray(x) ? x : x ? [x] : []).filter(function (j) { return typeof j === "string" && j; }); }
+  // A day's journeys: numbered steps in travel order. A step is either one line, or a short summary line
+  // with its detail folded underneath (tap to open) and, where the plan has a photo of that place, a small picture.
+  // "If something goes wrong" is folded too, so the day reads as steps first.
+  function journeyList(list, title, ifWrong, places) {
+    function isStep(j) { return typeof j === "string" ? !!j : !!(j && typeof j === "object" && !Array.isArray(j) && typeof j.step === "string" && j.step); }
+    function asList(x) { return (Array.isArray(x) ? x : x ? [x] : []).filter(isStep); }
     list = asList(list);
-    ifWrong = asList(ifWrong);
+    ifWrong = (Array.isArray(ifWrong) ? ifWrong : ifWrong ? [ifWrong] : []).filter(function (j) { return typeof j === "string" ? !!j : ptList(j).length; });
     if (!list.length && !ifWrong.length) return "";
     function item(j) {
+      if (typeof j !== "string") return step(j);
       var i = j.indexOf(": ");
       return '<li>' + (i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j)) + '</li>';
     }
+    function step(j) {
+      var more = ptList(j.more), im = thumb(stepPic(j, places));
+      var head = im + '<span class="step-sum">' + ptHtml(j.step) + '</span>';
+      var cr = j.image && j.credit && j.credit.url ? '<a class="credit step-credit" href="' + u(j.credit.url) + '" target="_blank" rel="noopener noreferrer">' + esc(creditText(j.credit)) + '</a>' : "";
+      return '<li' + (im ? ' class="has-thumb"' : "") + '>' + (more.length ? '<details class="step"><summary>' + head + '</summary>' + pts(more, "step-more") + cr + '</details>' : head + cr) + '</li>';
+    }
     return '<div class="journeys"><h4><span aria-hidden="true">🚆</span> ' + esc(title || "Journeys") + '</h4>' +
       (list.length ? '<ol class="journey-steps">' + list.map(item).join("") + '</ol>' : "") +
-      (ifWrong.length ? '<h5 class="ifwrong-h">If something goes wrong</h5><ul class="ifwrong">' + ifWrong.map(item).join("") + '</ul>' : "") +
+      (ifWrong.length ? '<details class="ifwrong-fold"><summary class="ifwrong-h">If something goes wrong (' + ifWrong.length + ')</summary><ul class="ifwrong">' +
+        ifWrong.map(function (j) { return '<li>' + ptItem(j) + '</li>'; }).join("") + '</ul></details>' : "") +
       '</div>';
+  }
+  // A step's picture: its own small photo (with credit), or the photo of a place of that day named in "pic".
+  function stepPic(j, places) {
+    if (j.image) return { image: j.image, credit: j.credit };
+    return j.pic ? (places || []).filter(function (x) { return x && x.name === j.pic; })[0] || null : null;
+  }
+  // Small photos (today's stops, journey steps) come from the plan's own pictures, and are put in only when
+  // their day opens, so a closed day costs nothing.
+  var thumbRefs = [];
+  function thumbSrc(p) { return p ? p.image || (p.wiki && ((window.ALBUM_IMAGES || {})[p.wiki] || wikiCache[p.wiki])) || "" : ""; }
+  function thumb(p) {
+    if (!thumbSrc(p)) return ""; thumbRefs.push(p);
+    var cr = p.credit && p.credit.url ? creditText(p.credit) : "";
+    return '<img class="thumb" alt="" data-thumb="' + (thumbRefs.length - 1) + '"' + (cr ? ' title="' + esc(cr) + '"' : "") + '>';
+  }
+  function fillThumbs(root) {
+    root.querySelectorAll("img[data-thumb]").forEach(function (img) {
+      var src = safeUrl(thumbSrc(thumbRefs[+img.dataset.thumb])); img.removeAttribute("data-thumb");
+      if (src !== "#") img.src = src; else img.remove();
+    });
+  }
+  // Today's stops: a folded, numbered list (time, name, map link, small photo), under the whole-day map button.
+  function stopsList(d, route) {
+    var ps = (d.places || []).filter(function (p) { return p && p.name; });
+    var btn = route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Open the whole day in Google Maps</a></div>' : "";
+    if (!ps.length) return btn;
+    return btn + '<details class="stops-fold"><summary><span aria-hidden="true">📍</span> Today\'s stops (' + ps.length + ')</summary><ol class="stops">' + ps.map(function (p) {
+      return '<li>' + thumb(p) + '<span class="stop-txt">' + (p.time ? '<span class="stop-time">' + esc(p.time) + '</span>' : "") + '<b>' + esc(p.name) + '</b></span>' +
+        '<a class="pin-link" href="' + u(mapUrl(p)) + '" target="_blank" rel="noopener noreferrer">Map <span aria-hidden="true">↗</span></a></li>';
+    }).join("") + '</ol></details>';
   }
   // A floating "Close this day" button: shown while you are inside an open day whose header has scrolled away.
   var dayIO = null, dayFloatDay = null, dayFloatScroll = false;
@@ -2045,7 +2087,7 @@
         var t = e.target; if (!t.matches || !t.matches("details.day, details[data-fold]")) return;
         var hid = t.dataset.h || ((document.querySelector("details.day[data-h]") || {}).dataset || {}).h;
         if (hid) foldRead(hid);
-        if (t.matches("details.day")) dayFloatUpdate();
+        if (t.matches("details.day")) { dayFloatUpdate(); if (t.open) fillThumbs(t); }
       }, true);
     }
     render();
@@ -2753,6 +2795,7 @@
     wirePics(root);
     if (dayN) { var dEl = document.getElementById(id + "-day" + dayN); if (dEl) dEl.scrollIntoView({ block: "start" }); }
     else window.scrollTo(0, 0);
+    document.querySelectorAll("details.day[open]").forEach(fillThumbs);
     dayFloatSetup();
     document.title = (h ? h.title + " · " : id === "rebuild" ? "Add your photos · " : "") + "Family Holiday Album";
   }
