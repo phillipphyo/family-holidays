@@ -881,3 +881,4 @@ ul.pts b { color: var(--ink); font-weight: 700; }
 .day-info ul.travel { margin: 0; font-size: 15px; }
 .place ul.note { margin-bottom: 4px; }
 .dec-why ul.pts, .dec-changes ul.pts { margin-top: 4px; }
+ul.pts-sub { margin-top: 4px; gap: 3px; }

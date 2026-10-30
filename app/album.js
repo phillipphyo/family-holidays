@@ -49,6 +49,8 @@
     var i = s.indexOf(": "), lab = i > 0 ? s.slice(0, i) : "";
     return lab && lab.length <= 40 && lab.split(/\s+/).length <= 4 ? '<b>' + esc(lab + ":") + '</b> ' + esc(s.slice(i + 2)) : esc(s);
   }
+  // One entry of a list (trip tips, booking lines): a point, or a list whose first point heads its sub-points.
+  function ptItem(y) { if (Array.isArray(y)) { y = ptList(y); return y.length ? ptHtml(y[0]) + pts(y.slice(1), "pts-sub") : ""; } return ptHtml(String(y)); }
   function pts(x, cls, id) {
     var at = (cls ? ' class="' + cls + (Array.isArray(x) ? " pts" : "") + '"' : Array.isArray(x) ? ' class="pts"' : "") + (id ? ' id="' + id + '"' : "");
     if (Array.isArray(x)) { x = ptList(x); return x.length ? '<ul' + at + '>' + x.map(function (y) { return '<li>' + ptHtml(y) + '</li>'; }).join("") + '</ul>' : ""; }
@@ -371,7 +373,7 @@
       ((h.memories || []).length ? '<div><span class="eyebrow">Photos</span><b>' + h.memories.length + '</b></div>' : "") + '</div>' +
       (h.walkingTotal ? '<p class="muted walk-total">' + esc(h.walkingTotal) + '</p>' : "") +
       dayChips(h, fold) +
-      ((h.journeyTips || []).length ? '<details class="tipbox fold" data-fold="tips"' + (fold.tips ? " open" : "") + '><summary><h4><span aria-hidden="true">🚆</span> Getting around: ' + h.journeyTips.length + (h.journeyTips.length === 1 ? " tip" : " tips") + '</h4><span class="fold-hint" aria-hidden="true"></span></summary><ul>' + h.journeyTips.map(function (t) { return '<li>' + ptHtml(String(t)) + '</li>'; }).join("") + '</ul>' +
+      ((h.journeyTips || []).length ? '<details class="tipbox fold" data-fold="tips"' + (fold.tips ? " open" : "") + '><summary><h4><span aria-hidden="true">🚆</span> Getting around: ' + h.journeyTips.length + (h.journeyTips.length === 1 ? " tip" : " tips") + '</h4><span class="fold-hint" aria-hidden="true"></span></summary><ul>' + h.journeyTips.map(function (t) { return '<li>' + ptItem(t) + '</li>'; }).join("") + '</ul>' +
         (h.journeyNote ? '<p class="muted">' + esc(h.journeyNote) + '</p>' : "") + '</details>' : "") + (quickBox(h) ? '<p class="notice keeper-note">This trip opens slowly on phones. <button class="btn small keeper-open" type="button">Fix it at the bottom of the page</button></p>' : "") +
       '<div class="summary">' + (h.travellers ? '<p class="eyebrow">' + esc(h.travellers) + '</p>' : "") + summaryText(h.summary) +
       ((h.links || []).length ? '<div class="links">' + h.links.map(function (l, i) { return '<a class="btn' + (i ? "" : " primary") + '" href="' + u(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.label) + '</a>'; }).join("") + '</div>' : "") + '</div>';
@@ -2269,7 +2271,7 @@
   function bookingsList(h) {
     var list = h.bookings.slice().sort(function (a, b) { var x = String(a.date || "") + (a.time || ""), y = String(b.date || "") + (b.time || ""); return x < y ? -1 : x > y ? 1 : 0; });
     function row(k, v) { return v ? '<div><dt>' + k + '</dt><dd>' + v + '</dd></div>' : ""; }
-    function lines(x) { x = [].concat(x || []).filter(Boolean).map(String); return x.length ? x.length === 1 ? ptHtml(x[0]) : '<ul>' + x.map(function (y) { return '<li>' + ptHtml(y) + '</li>'; }).join("") + '</ul>' : ""; }
+    function lines(x) { x = [].concat(x || []).filter(Boolean); return x.length ? x.length === 1 ? ptItem(x[0]) : '<ul>' + x.map(function (y) { return '<li>' + ptItem(y) + '</li>'; }).join("") + '</ul>' : ""; }
     return '<div class="book-list">' +
       list.map(function (b) {
         var st = bookingStatus(b), c = b.contact || {};
@@ -2286,7 +2288,7 @@
   // and everything needed to decide (times, prices, why, what it changes, links).
   function linkList(ls) { ls = [].concat(ls || []).filter(function (l) { return l && /^https:\/\//i.test(l.url || ""); }); return ls.length ? '<p class="dec-links">' + ls.map(function (l) { return '<a href="' + esc(safeUrl(l.url)) + '" target="_blank" rel="noopener">' + esc(l.label || "Link") + ' ↗</a>'; }).join("") + '</p>' : ""; }
   function decisionsList(h) {
-    function lines(x) { x = [].concat(x || []).filter(Boolean).map(String); return x.length ? '<ul>' + x.map(function (y) { return '<li>' + ptHtml(y) + '</li>'; }).join("") + '</ul>' : ""; }
+    function lines(x) { x = [].concat(x || []).filter(Boolean); return x.length ? '<ul>' + x.map(function (y) { return '<li>' + ptItem(y) + '</li>'; }).join("") + '</ul>' : ""; }
     // A labelled paragraph, or the label above a list of points.
     function labelled(cls, label, x) { return !txt(x) ? "" : Array.isArray(x) ? '<div class="' + cls + '"><b>' + label + '</b>' + pts(x) + '</div>' : '<p class="' + cls + '"><b>' + label + '</b> ' + esc(x) + '</p>'; }
     return '<p class="dec-intro">Nothing here is booked yet. Each card shows the choices, what each one changes, and the one we recommend. Tell Claude your pick and the plan is updated.</p><div class="dec-list">' +
