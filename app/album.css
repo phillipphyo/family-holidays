@@ -870,3 +870,14 @@ details.keeper .tipbox, details.keeper .plan-box { margin-top: 12px; }
 .venue-pin .pin-link { font-size: 14px; color: var(--indigo); }
 .pickups .pin-link { color: var(--indigo); white-space: nowrap; margin-left: 4px; }
 .pickups .approx { color: var(--muted); font-size: 13px; }
+/* Card texts written as short points: a compact bullet list, each label in bold. */
+ul.pts { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+ul.pts li { line-height: 1.5; }
+ul.pts li::marker { color: var(--indigo); }
+ul.pts b { color: var(--ink); font-weight: 700; }
+.more-row ul.pts { font-size: 15px; gap: 6px; }
+.more-row ul.pts li { line-height: 1.55; }
+.more-row ul.more-lead { font-size: 16px; color: var(--ink); }
+.day-info ul.travel { margin: 0; font-size: 15px; }
+.place ul.note { margin-bottom: 4px; }
+.dec-why ul.pts, .dec-changes ul.pts { margin-top: 4px; }
