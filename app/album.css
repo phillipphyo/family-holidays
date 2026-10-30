@@ -926,5 +926,5 @@ ul.pts-sub { margin-top: 4px; gap: 3px; }
 .stops-fold .stop-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .stops-fold .pin-link { flex: none; color: var(--indigo); white-space: nowrap; }
 /* "Where to catch it": each place name on its own line, in the accent colour, above its description. */
-.pickups ul { gap: 12px; }
+.pickups ul { row-gap: 12px; }
 .pickups li > b:first-child { display: block; margin-bottom: 2px; font-size: 15px; line-height: 1.35; color: var(--indigo); }
