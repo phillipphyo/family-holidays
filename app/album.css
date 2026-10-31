@@ -8,6 +8,7 @@
   --line: #dbe0eb;
   --indigo: #2a3a8f;
   --gold: #c98a12; --ja: #8f4f00;
+  --hl-time: #0a6b6b; --hl-date: #6a3d9a; --hl-money: #1d6b2a; --hl-place: #b0372a; --hl-num: #9c2f73; --hl-choice: #5c6300;
   --maple: #b33a2c;
   --on-indigo: #ffffff;
   --shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(22, 30, 53, .05), 0 6px 18px -6px rgba(22, 30, 53, .14);
@@ -30,7 +31,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper: #0e1322; --surface: #161d31; --ink: #e8ebf4; --muted: #9ba4ba; --line: #283150;
-    --indigo: #9fb1ff; --gold: #f0b847; --ja: #f0b847; --maple: #f07a62; --on-indigo: #0e1322;
+    --indigo: #9fb1ff; --gold: #f0b847; --ja: #f0b847; --hl-time: #5ed0cb; --hl-date: #c7a4ff; --hl-money: #86d993; --hl-place: #ff8f78; --hl-num: #f29ad2; --hl-choice: #d6d36a; --maple: #f07a62; --on-indigo: #0e1322;
     --shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
     --shadow-lg: 0 0 0 1px rgba(255,255,255,.12), 0 28px 64px -12px rgba(0,0,0,.7);
     --hair: rgba(255,255,255,.08); --focus: #9fb1ff; --focus-halo: rgba(159, 177, 255, .22);
@@ -44,7 +45,7 @@
 }
 :root[data-theme="dark"] {
   --paper: #0e1322; --surface: #161d31; --ink: #e8ebf4; --muted: #9ba4ba; --line: #283150;
-  --indigo: #9fb1ff; --gold: #f0b847; --ja: #f0b847; --maple: #f07a62; --on-indigo: #0e1322;
+  --indigo: #9fb1ff; --gold: #f0b847; --ja: #f0b847; --hl-time: #5ed0cb; --hl-date: #c7a4ff; --hl-money: #86d993; --hl-place: #ff8f78; --hl-num: #f29ad2; --hl-choice: #d6d36a; --maple: #f07a62; --on-indigo: #0e1322;
   --shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
     --shadow-lg: 0 0 0 1px rgba(255,255,255,.12), 0 28px 64px -12px rgba(0,0,0,.7);
     --hair: rgba(255,255,255,.08); --focus: #9fb1ff; --focus-halo: rgba(159, 177, 255, .22);
@@ -939,4 +940,15 @@ ul.pts-sub { margin-top: 4px; gap: 3px; }
 /* Bold lead-in labels in the site's blue; Japanese words in a warm second colour (both at least 4.5:1). */
 b.lbl.lbl { color: var(--indigo); }
 .ja { color: var(--ja); }
-@media print { .lbl, .ja { color: inherit; } }
+/* Colour categories in text (each at least 4.5:1 on the page and card backgrounds in light and dark).
+   Besides colour: money is bold, places have a dotted underline and choices are in italics, for readers who don't see colour well. */
+.hl-time { color: var(--hl-time); font-variant-numeric: tabular-nums; }
+.hl-date { color: var(--hl-date); }
+.hl-money { color: var(--hl-money); font-weight: 700; }
+.hl-place { color: var(--hl-place); text-decoration: underline dotted 1px; text-underline-offset: 3px; }
+.hl-num { color: var(--hl-num); }
+.hl-choice { color: var(--hl-choice); font-style: italic; }
+.place .time, .venue-top .time { color: var(--hl-time); }
+.hl-key { margin: 0 0 14px; font-size: 13px; line-height: 1.8; color: var(--muted); }
+.hl-key-t { font-weight: 700; color: var(--ink); }
+@media print { b.lbl.lbl, .ja, .hl-time, .hl-date, .hl-money, .hl-place, .hl-num, .hl-choice, .place .time, .venue-top .time { color: inherit; } .hl-key { display: none; } }
