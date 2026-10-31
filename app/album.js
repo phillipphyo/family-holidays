@@ -488,9 +488,9 @@
         html += '<div class="places">' + d.places.map(function (p, pi) {
           var vk = (i + 1) + "." + (pi + 1), v = past && visits[vk], own = v && v.pic;
           return '<div class="place">' + pic({ image: p.image, wiki: p.wiki, credit: p.credit, name: p.name, type: p.type, area: p.areaPhoto, decorative: true }) +
-            '<div class="body"><div class="top"><span class="card-no" aria-label="Stop ' + (pi + 1) + '">' + (pi + 1) + '</span><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
+            '<div class="body"><div class="top"><span class="card-no" aria-hidden="true">' + (pi + 1) + '</span><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
             (p.time ? '<span class="time">' + esc(p.time) + '</span>' : "") + (shots[p.name] ? '<span class="time">📷 ' + shots[p.name] + '</span>' : "") + '</div>' +
-            '<h4>' + esc(p.name) + '</h4>' + pts(p.note, "note") + infoLink(p) + '<div class="card-actions">' + moreButton(p, d.city) + linkRow(p) + '</div></div></div>';
+            '<h4><span class="sr-only">Stop ' + (pi + 1) + ': </span>' + esc(p.name) + '</h4>' + pts(p.note, "note") + infoLink(p) + '<div class="card-actions">' + moreButton(p, d.city) + linkRow(p) + '</div></div></div>';
         }).join("") + '</div>';
       }
       if (mem.length) html += memoryGrid(mem);
@@ -523,9 +523,9 @@
   function placeCardPast(h, d, p, i, pi, v) {
     var vk = (i + 1) + "." + (pi + 1), own = v && v.pic;
     return '<div class="place">' + pic({ image: own ? own.thumb || own.image : p.image, vk: own && !own.thumb && !own.image ? h.id + ":" + own.k : "", wiki: own ? "" : p.wiki, name: p.name, type: p.type, decorative: true }) +
-            '<div class="body"><div class="top"><span class="card-no" aria-label="Stop ' + (pi + 1) + '">' + (pi + 1) + '</span><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
+            '<div class="body"><div class="top"><span class="card-no" aria-hidden="true">' + (pi + 1) + '</span><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
             (v && v.first ? '<span class="time">' + esc(v.first + (v.last && v.last !== v.first ? " to " + v.last : "")) + '</span>' : "") + (v ? '<span class="time">📷 ' + v.mems.length + '</span>' : "") + '</div>' +
-            '<h4>' + esc(p.name) + '</h4>' + (p.info && p.info.lead ? '<p class="note">' + esc(p.info.lead) + '</p>' : "") +
+            '<h4><span class="sr-only">Stop ' + (pi + 1) + ': </span>' + esc(p.name) + '</h4>' + (p.info && p.info.lead ? '<p class="note">' + esc(p.info.lead) + '</p>' : "") +
             '<div class="card-actions">' + moreButton(p, d.city, { visit: visitText(d, v), pic: own, photos: "" }) + linkRow(p) + '</div></div></div>';
   }
   // Each ride as "how: time, how often, cost", with the part before the first colon in bold.

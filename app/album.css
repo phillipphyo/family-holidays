@@ -189,7 +189,7 @@ main section.cover { margin-top: 0; }
 .place .body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .place h4 { margin: 0; font: 700 17px/1.3 var(--body); }
 .place .note { font-size: 14px; color: var(--muted); }
-.place .top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.place .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; }
 .place .time { font: 500 12px/1 var(--mono); color: var(--muted); }
 .memories { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr)); gap: 10px; margin-top: 14px; }
 .memories figure { margin: 0; display: grid; gap: 4px; }
