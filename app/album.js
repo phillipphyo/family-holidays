@@ -88,6 +88,8 @@
   var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   var WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   function nice(s, withDay) { var d = parseDate(s); return (withDay ? WD[d.getDay()] + " " : "") + d.getDate() + " " + MON[d.getMonth()] + " " + d.getFullYear(); }
+  // A day card's date badge: the day number as a small label, then the date kept together as "Mon 7 Dec".
+  function stubDate(label, d) { return '<span class="d dn">' + esc(label) + '</span><span class="dt"><span class="d wd">' + WD[d.getDay()] + '</span><span class="big">' + d.getDate() + '</span><span class="d mo">' + MON[d.getMonth()] + '</span></span>'; }
   function niceShort(s) { var d = parseDate(s); return d.getDate() + " " + MON[d.getMonth()]; }
   function daysBetween(a, b) { return Math.round((parseDate(b) - parseDate(a)) / 86400000); }
   function today() { return iso(new Date()); }
@@ -414,7 +416,7 @@
       var n = i + 1, names = (d.places || []).map(function (p) { return p.name; }), isOpen = fold.days.indexOf(n) >= 0;
       var ci = checkInFor(h, stays, i), photosN = past ? mem.length : 0, dp = !past && dayPhoto(d);
       html += '<details class="day" id="' + esc(h.id + "-day" + n) + '" data-h="' + esc(h.id) + '" data-day="' + n + '"' + (isOpen ? " open" : "") + '><summary class="day-sum"><div class="ticket">' +
-        '<div class="stub' + (dp ? ' has-photo' : '') + '" aria-hidden="true">' + (dp ? '<img class="stub-img" src="' + u(dp.image) + '" alt="" loading="lazy">' : '') + '<span class="d">Day ' + n + '</span><span class="big">' + dd.getDate() + '</span><span class="d">' + WD[dd.getDay()] + ' ' + MON[dd.getMonth()] + '</span></div>' +
+        '<div class="stub' + (dp ? ' has-photo' : '') + '" aria-hidden="true">' + (dp ? '<img class="stub-img" src="' + u(dp.image) + '" alt="" loading="lazy">' : '') + stubDate("Day " + n, dd) + '</div>' +
         '<div class="main"><h3><span class="sr-only">Day ' + n + ', ' + WD[dd.getDay()] + ' ' + dd.getDate() + ' ' + MON[dd.getMonth()] + ': </span>' + esc(d.title || d.city || "") + '</h3>' +
         '<div class="meta">' + (d.city ? '<span>In <b>' + esc(d.city) + '</b></span>' : "") + (d.sleep ? '<span>Sleep at <b>' + esc(d.sleep) + '</b>' + (ci ? ' · check-in ' + esc(ci) : "") + '</span>' : "") + '</div>' +
         (names.length ? '<p class="day-stops">' + esc(names.slice(0, 3).join(" · ")) + (names.length > 3 ? ' <span class="muted">+' + (names.length - 3) + ' more</span>' : "") + '</p>' : "") +
@@ -458,7 +460,7 @@
     });
     var extra = Object.keys(byDate).sort();
     extra.forEach(function (date) {
-      html += '<details class="day extra" id="' + esc(h.id + "-extra-" + date) + '"><summary class="day-sum"><div class="ticket"><div class="stub" aria-hidden="true"><span class="d">Extra</span><span class="big">' + parseDate(date).getDate() + '</span><span class="d">' + niceShort(date) + '</span></div>' +
+      html += '<details class="day extra" id="' + esc(h.id + "-extra-" + date) + '"><summary class="day-sum"><div class="ticket"><div class="stub" aria-hidden="true">' + stubDate("Extra", parseDate(date)) + '</div>' +
         '<div class="main"><h3><span class="sr-only">Extra day, ' + esc(niceShort(date)) + ': </span>More photos</h3><p class="day-photos"><span aria-hidden="true">📷</span> ' + byDate[date].length + ' photos</p><span class="day-toggle" aria-hidden="true"><span class="t-show">Show the day</span><span class="t-hide">Hide the day</span><span class="chev" aria-hidden="true"></span></span></div></div></summary><div class="day-body">' + memoryGrid(byDate[date]) + '</div></details>';
     });
     html += '</section>';

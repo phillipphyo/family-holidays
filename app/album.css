@@ -231,7 +231,10 @@ footer.wrap::before { content: ""; position: absolute; left: 0; right: 0; top: 0
 @media (max-width: 560px) {
   .ticket { grid-template-columns: 1fr; }
   .ticket .stub { display: flex; align-items: baseline; gap: 10px; padding: 12px 16px 14px; text-align: left; }
-  .ticket .stub .big { order: -1; font-size: 28px; }
+  .ticket .stub { align-items: center; justify-content: space-between; }
+  .ticket .stub .dt { display: flex; align-items: baseline; gap: 6px; }
+  .ticket .stub .big { font-size: 28px; }
+  .ticket .stub .dn { padding: 3px 9px; border: 1px solid currentColor; border-radius: 999px; }
   .ticket .stub::after { top: auto; bottom: -3px; left: 14px; right: 14px; width: auto; height: 6px; background: radial-gradient(circle, var(--surface) 2px, transparent 2.5px) left center / 10px 6px repeat-x; }
   .place .pic { aspect-ratio: 16 / 9; }
   .facts div:last-child:nth-child(odd) { grid-column: 1 / -1; }
@@ -928,3 +931,8 @@ ul.pts-sub { margin-top: 4px; gap: 3px; }
 /* "Where to catch it": each place name on its own line, in the accent colour, above its description. */
 .pickups ul { row-gap: 12px; }
 .pickups li > b:first-child { display: block; margin-bottom: 2px; font-size: 15px; line-height: 1.35; color: var(--indigo); }
+/* Date badge: "Day 9" above the date, which reads as one group: big day of the month, weekday and month under it. */
+.ticket .stub .dt { display: grid; grid-template-columns: auto auto; justify-content: center; column-gap: 6px; row-gap: 2px; }
+.ticket .stub .dt .big { grid-column: 1 / -1; grid-row: 1; }
+.ticket .stub .dt .wd, .ticket .stub .dt .mo { grid-row: 2; }
+@media (max-width: 560px) { .ticket .stub .dt { display: flex; align-items: baseline; gap: 6px; } }
