@@ -45,9 +45,13 @@
   // A point written "Label: text" shows its label in bold when the label is short (up to 4 words).
   function ptList(x) { return (Array.isArray(x) ? x : []).filter(function (y) { return typeof y === "string" && y.trim(); }); }
   function txt(x) { return Array.isArray(x) ? ptList(x).join(" ") : x ? String(x) : ""; }
+  // Japanese words in visible text get their own colour (and lang, so they are read out in Japanese).
+  // Only for text already escaped: Japanese letters never contain the characters esc() changes.
+  var JA_RE = /[　-〿぀-ヿ㐀-䶿一-鿿！-｠]+/g;
+  function jp(h) { return h.replace(JA_RE, function (m) { return '<span class="ja" lang="ja">' + m + '</span>'; }); }
   function ptHtml(s) {
     var i = s.indexOf(": "), lab = i > 0 ? s.slice(0, i) : "";
-    return lab && lab.length <= 40 && lab.split(/\s+/).length <= 4 ? '<b>' + esc(lab + ":") + '</b> ' + esc(s.slice(i + 2)) : esc(s);
+    return lab && lab.length <= 40 && lab.split(/\s+/).length <= 4 ? '<b class="lbl">' + jp(esc(lab + ":")) + '</b> ' + jp(esc(s.slice(i + 2))) : jp(esc(s));
   }
   // One entry of a list (trip tips, booking lines): a point, or a list whose first point heads its sub-points.
   function ptItem(y) { if (Array.isArray(y)) { y = ptList(y); return y.length ? ptHtml(y[0]) + pts(y.slice(1), "pts-sub") : ""; } return y == null ? "" : ptHtml(String(y)); }
@@ -57,7 +61,7 @@
     var list = Array.isArray(x), names = [cls, list ? "pts" : ""].filter(Boolean).join(" ");
     var at = (names ? ' class="' + names + '"' : "") + (id ? ' id="' + id + '"' : "");
     if (list) { x = ptList(x); return x.length ? '<ul' + at + '>' + x.map(function (y) { return '<li>' + ptHtml(y) + '</li>'; }).join("") + '</ul>' : ""; }
-    return x ? '<p' + at + '>' + esc(x) + '</p>' : "";
+    return x ? '<p' + at + '>' + jp(esc(x)) + '</p>' : "";
   }
   // Only allow web links, embedded pictures and files inside this website.
   function safeMedia(v) { return /^data:video\/(webm|mp4);base64,/i.test(String(v || "")) ? v : ""; }
@@ -505,7 +509,7 @@
     var rich = list.some(function (j) { return typeof j !== "string"; });
     function item(j) {
       if (typeof j !== "string") return step(j);
-      var i = j.indexOf(": "), t = i > 0 ? '<b>' + esc(j.slice(0, i + 1)) + '</b> ' + esc(j.slice(i + 2)) : esc(j);
+      var i = j.indexOf(": "), t = i > 0 ? '<b class="lbl">' + jp(esc(j.slice(0, i + 1))) + '</b> ' + jp(esc(j.slice(i + 2))) : jp(esc(j));
       return '<li>' + (rich ? '<span class="step-body">' + t + '</span>' : t) + '</li>';
     }
     function step(j) {
@@ -614,7 +618,7 @@
     if (!list.length) return "";
     function a(url, label) { return /^https:\/\//i.test(url || "") ? ' <a class="pin-link" href="' + esc(safeUrl(url)) + '" target="_blank" rel="noopener noreferrer">' + label + ' <span aria-hidden="true">↗</span></a>' : ""; }
     return '<div class="journeys pickups"><h4><span aria-hidden="true">📍</span> Where to catch it</h4><ul>' + list.map(function (x) {
-      return '<li><b>' + esc(x.name) + ':</b> ' + esc(x.where || "") + (x.approx ? ' <span class="approx">(pin is approximate)</span>' : "") + a(x.map, "Map") + a(x.photo, "Street photo") + '</li>';
+      return '<li><b>' + jp(esc(x.name)) + ':</b> ' + jp(esc(x.where || "")) + (x.approx ? ' <span class="approx">(pin is approximate)</span>' : "") + a(x.map, "Map") + a(x.photo, "Street photo") + '</li>';
     }).join("") + '</ul></div>';
   }
   // The YouTube player only appears after a tap, one at a time, built from the checked video id.
@@ -2341,7 +2345,7 @@
   function decisionsList(h) {
     function lines(x) { x = [].concat(x || []).filter(hasPt); return x.length ? '<ul>' + x.map(function (y) { return '<li>' + ptItem(y) + '</li>'; }).join("") + '</ul>' : ""; }
     // A labelled paragraph, or the label above a list of points.
-    function labelled(cls, label, x) { return !txt(x) ? "" : Array.isArray(x) ? '<div class="' + cls + '"><b>' + label + '</b>' + pts(x) + '</div>' : '<p class="' + cls + '"><b>' + label + '</b> ' + esc(x) + '</p>'; }
+    function labelled(cls, label, x) { return !txt(x) ? "" : Array.isArray(x) ? '<div class="' + cls + '"><b>' + label + '</b>' + pts(x) + '</div>' : '<p class="' + cls + '"><b>' + label + '</b> ' + jp(esc(x)) + '</p>'; }
     return '<p class="dec-intro">Nothing here is booked yet. Each card shows the choices, what each one changes, and the one we recommend. Tell Claude your pick and the plan is updated.</p><div class="dec-list">' +
       h.decisions.map(function (q) {
         return '<article class="dec"><div class="book-top"><span class="book-when">' + esc(q.when || "") + '</span><span class="stay-status decide">Pending decision</span></div>' +
