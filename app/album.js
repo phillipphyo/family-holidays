@@ -49,12 +49,12 @@
   // fmt() works on the raw text and escapes every piece itself, so a match can never land inside markup.
   // Place words also include the trip's own city names (set per holiday by setPlaceWords).
   var HL_SRC = [
-    ["money", "(?:SGD|S\\$)\\s?\\d{1,3}(?:,\\d{3})*(?:\\.\\d+)?(?:\\s?(?:to|-|–)\\s?\\d{1,3}(?:,\\d{3})*(?:\\.\\d+)?)?|¥\\s?\\d{1,3}(?:,\\d{3})*(?:\\s?(?:to|-|–)\\s?¥?\\d{1,3}(?:,\\d{3})*)?|\\b\\d{1,3}(?:,\\d{3})*\\s?yen\\b"],
+    ["money", "(?:SGD|S\\$)\\s?(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?(?:\\s?(?:to|-|–)\\s?(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?)?|¥\\s?(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\s?(?:to|-|–)\\s?¥?(?:\\d{1,3}(?:,\\d{3})+|\\d+))?|\\b(?:\\d{1,3}(?:,\\d{3})+|\\d+)\\s?yen\\b"],
     ["time", "\\b(?:[01]?\\d|2[0-4]):[0-5]\\d(?:\\s?(?:to|-|–)\\s?(?:[01]?\\d|2[0-4]):[0-5]\\d)?\\b"],
     ["date", "\\b(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\\s)?\\d{1,2}\\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\b(?:\\s20\\d\\d)?|\\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\\sto\\s(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\\b"],
     ["num", "\\b(?:[Cc]ars?|No\\.|[Ss]tand|[Pp]latforms?|[Ss]eats?|[Ss]top|[Ee]xit|[Bb]ay|[Gg]ate)\\s\\d+[A-Z]?(?![\\d:])(?:(?:,\\s?|\\sand\\s)\\d+[A-Z]?(?![\\d:]))*\\b|\\b\\d+(?:[.,]\\d+)?(?:\\s?(?:to|-|–)\\s?\\d+(?:[.,]\\d+)?)?\\s?(?:min|mins|minutes?|hours?|hrs?|km|kg|cm|m|steps|nights?|days?|pieces?|people|stops?|bags?)\\b|\\bfor\\s\\d+(?!\\d|:\\d)\\b"],
     ["choice", "\\b(?:[Oo]ptional|[Oo]ptions?\\s[A-D](?:\\s(?:and|or)\\s[A-D])?|[Pp]ending decision|[Pp]ending|[Cc]hoice\\s[A-C]|[Ee]vening\\s[A-C]\\b|if you pick it)\\b"],
-    ["place", "\\b(?:Terminal\\s[12]|T[12]|B[1-3]|[1-9]\\d?F)\\b|\\b(?:JR\\s|Kintetsu\\s|Odakyu\\s)?[A-Z][A-Za-z-]+(?:[ -][A-Z][A-Za-z-]+){0,2}\\s[Ss]tation\\b"],
+    ["place", "\\b(?:Terminal\\s[12]|T[12]|B[1-3]|[1-9]\\d?F)\\b|\\b(?:JR\\s|Kintetsu\\s|Odakyu\\s)?[A-Z][A-Za-z]+(?:[ -][A-Z][A-Za-z]+){0,2}\\s[Ss]tation\\b"],
     ["ja", "[\\u3000-\\u303f\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uff01-\\uff60]+"]
   ];
   var HL_RE = null;
@@ -67,7 +67,7 @@
   setPlaceWords([]);
   var HL_CLS = HL_SRC.map(function (c) { return c[0] === "ja" ? "ja" : "hl-" + c[0]; });
   function hlKey() {
-    return '<p class="hl-key" aria-label="Colour key"><span class="hl-key-t">Colours:</span> <span class="hl-time">Time</span> · <span class="hl-date">Date</span> · <span class="hl-money">Money</span> · ' +
+    return '<p class="hl-key" aria-hidden="true"><span class="hl-key-t">Colours:</span> <span class="hl-time">Time</span> · <span class="hl-date">Date</span> · <span class="hl-money">Money</span> · ' +
       '<span class="hl-place">Place</span> · <span class="hl-num">Number</span> · <span class="hl-choice">Choice</span> · <span class="ja">Japanese</span> · <b class="lbl">Label</b></p>';
   }
   function fmt(s) {
@@ -396,6 +396,7 @@
 
   // ---------- one holiday ----------
   function holidayView(h) {
+    setPlaceWords((h.days || []).map(function (d) { return d.city; }));
     var st = status(h);
     var nDays = daysBetween(h.start, h.end) + 1;
     var nights = nDays - 1;
@@ -445,7 +446,6 @@
     }
     html += glanceBox(h, fold, past, stays, staysHtml);
 
-    setPlaceWords((h.days || []).map(function (d) { return d.city; }));
     html += hlKey() + '<section><div class="section-head"><h2>Day by day</h2><span class="eyebrow">Tap a day to see its trains, tips and stops</span>' +
       ((h.days || []).length > 1 ? '<button class="btn small days-all" type="button" data-h="' + esc(h.id) + '">' + (fold.days.length >= h.days.length ? "Close all days" : "Open all days") + '</button>' : "") + '</div>';
     (h.days || []).forEach(function (d, i) {

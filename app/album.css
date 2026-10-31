@@ -945,7 +945,7 @@ b.lbl.lbl { color: var(--indigo); }
 .hl-time { color: var(--hl-time); font-variant-numeric: tabular-nums; }
 .hl-date { color: var(--hl-date); }
 .hl-money { color: var(--hl-money); font-weight: 700; }
-.hl-place { color: var(--hl-place); text-decoration: underline dotted 1px; text-underline-offset: 3px; }
+.hl-place { color: var(--hl-place); text-decoration-line: underline; text-decoration-style: dotted; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .hl-num { color: var(--hl-num); }
 .hl-choice { color: var(--hl-choice); font-style: italic; }
 .place .time, .venue-top .time { color: var(--hl-time); }
