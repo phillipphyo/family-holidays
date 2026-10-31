@@ -282,7 +282,6 @@ footer.wrap::before { content: ""; position: absolute; left: 0; right: 0; top: 0
 .journeys ul, .tipbox ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .journeys li::marker, .tipbox li::marker { color: var(--indigo); }
 .journeys b { font-weight: 700; color: var(--ink); }
-@media (min-width: 900px) { .journeys ul { grid-template-columns: 1fr 1fr; column-gap: 28px; } }
 /* A day's rides: numbered steps in one column, then the backups in one column. */
 .journeys ol.journey-steps { margin: 0; padding-left: 24px; display: grid; grid-template-columns: 1fr; gap: 6px; }
 .journeys ol.journey-steps li::marker { font-weight: 700; }
@@ -931,7 +930,7 @@ ul.pts-sub { margin-top: 4px; gap: 3px; }
 .stops-fold .pin-link { flex: none; color: var(--indigo); white-space: nowrap; }
 /* "Where to catch it": each place name on its own line, in the accent colour, above its description. */
 .pickups ul { row-gap: 12px; }
-.pickups li > b:first-child { display: block; margin-bottom: 2px; font-size: 15px; line-height: 1.35; color: var(--indigo); }
+.pickups li > b:first-of-type { display: block; margin-bottom: 2px; font-size: 15px; line-height: 1.35; color: var(--indigo); }
 /* Date badge: "Day 9" above the date, which reads as one group: big day of the month, weekday and month under it. */
 .ticket .stub .dt { display: grid; grid-template-columns: auto auto; justify-content: center; column-gap: 6px; row-gap: 2px; }
 .ticket .stub .dt .big { grid-column: 1 / -1; grid-row: 1; }
@@ -952,3 +951,13 @@ b.lbl.lbl { color: var(--indigo); }
 .hl-key { margin: 0 0 14px; font-size: 13px; line-height: 1.8; color: var(--muted); }
 .hl-key-t { font-weight: 700; color: var(--ink); }
 @media print { b.lbl.lbl, .ja, .hl-time, .hl-date, .hl-money, .hl-place, .hl-num, .hl-choice, .place .time, .venue-top .time { color: inherit; } .hl-key { display: none; } }
+/* "Where to catch it": one numbered column in travel order, read top to bottom on every screen. */
+.pickups ul { list-style: decimal; padding-left: 26px; }
+.pickups li::marker { font-weight: 700; color: var(--indigo); }
+/* A pickup's tag names the journey step it belongs to ("Step 2"), so the two lists can be read together. */
+.step-ref { display: inline-block; margin: 0 0 3px; padding: 1px 8px; border: 1px solid var(--indigo-edge); border-radius: 999px; font: 600 11px/1.5 var(--body); color: var(--indigo); background: var(--indigo-tint); }
+@media print { .step-ref { border-color: currentColor; background: none; color: inherit; } }
+/* Each place card shows its number in the day, the same as in "Today's stops", so a row of cards is read 1, 2, 3. */
+.place .card-no { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 999px; background: var(--indigo); color: var(--on-indigo); font: 700 12px/1 var(--body); flex: none; }
+.place .top .card-no + .chip { margin-right: auto; }
+@media print { .place .card-no { background: none; color: inherit; border: 1px solid currentColor; } }
