@@ -929,7 +929,7 @@ ul.pts-sub { margin-top: 4px; gap: 3px; }
 .stops-fold .stop-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .stops-fold .pin-link { flex: none; color: var(--indigo); white-space: nowrap; }
 /* "Where to catch it": each place name on its own line, in the accent colour, above its description. */
-.pickups ul { row-gap: 12px; }
+.pickups ol { margin: 0; display: grid; gap: 4px; row-gap: 12px; }
 .pickups li > b:first-of-type { display: block; margin-bottom: 2px; font-size: 15px; line-height: 1.35; color: var(--indigo); }
 /* Date badge: "Day 9" above the date, which reads as one group: big day of the month, weekday and month under it. */
 .ticket .stub .dt { display: grid; grid-template-columns: auto auto; justify-content: center; column-gap: 6px; row-gap: 2px; }
@@ -951,8 +951,8 @@ b.lbl.lbl { color: var(--indigo); }
 .hl-key { margin: 0 0 14px; font-size: 13px; line-height: 1.8; color: var(--muted); }
 .hl-key-t { font-weight: 700; color: var(--ink); }
 @media print { b.lbl.lbl, .ja, .hl-time, .hl-date, .hl-money, .hl-place, .hl-num, .hl-choice, .place .time, .venue-top .time { color: inherit; } .hl-key { display: none; } }
-/* "Where to catch it": one numbered column in travel order, read top to bottom on every screen. */
-.pickups ul { list-style: decimal; padding-left: 26px; }
+/* "Where to catch it": one lettered column (A, B, C) in travel order, read top to bottom; letters, so they are not mistaken for journey step numbers. */
+.pickups ol { list-style: upper-alpha; padding-left: 26px; }
 .pickups li::marker { font-weight: 700; color: var(--indigo); }
 /* A pickup's tag names the journey step it belongs to ("Step 2"), so the two lists can be read together. */
 .step-ref { display: inline-block; margin: 0 0 3px; padding: 1px 8px; border: 1px solid var(--indigo-edge); border-radius: 999px; font: 600 11px/1.5 var(--body); color: var(--indigo); background: var(--indigo-tint); }

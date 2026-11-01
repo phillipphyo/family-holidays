@@ -651,9 +651,9 @@
     list = (list || []).filter(function (x) { return x && x.name; });
     if (!list.length) return "";
     function a(url, label) { return /^https:\/\//i.test(url || "") ? ' <a class="pin-link" href="' + esc(safeUrl(url)) + '" target="_blank" rel="noopener noreferrer">' + label + ' <span aria-hidden="true">↗</span></a>' : ""; }
-    return '<div class="journeys pickups"><h4><span aria-hidden="true">📍</span> Where to catch it</h4><ul>' + list.map(function (x) {
+    return '<div class="journeys pickups"><h4><span aria-hidden="true">📍</span> Where to catch it</h4><ol type="A">' + list.map(function (x) {
       return '<li>' + (typeof x.step === "string" && x.step ? '<span class="step-ref">' + esc(x.step) + '</span> ' : "") + '<b>' + fmt(x.name) + ':</b> ' + fmt(x.where || "") + (x.approx ? ' <span class="approx">(pin is approximate)</span>' : "") + a(x.map, "Map") + a(x.photo, "Street photo") + '</li>';
-    }).join("") + '</ul></div>';
+    }).join("") + '</ol></div>';
   }
   // The YouTube player only appears after a tap, one at a time, built from the checked video id.
   var ytOpen = null;
