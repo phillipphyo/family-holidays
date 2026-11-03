@@ -961,3 +961,10 @@ b.lbl.lbl { color: var(--indigo); }
 .place .card-no { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 999px; background: var(--indigo); color: var(--on-indigo); font: 700 12px/1 var(--body); flex: none; }
 .place .top .card-no + .chip { margin-right: auto; }
 @media print { .place .card-no { background: none; color: inherit; border: 1px solid currentColor; } }
+/* "Must know" box: a few critical points, on the day, a card and its pop-up (colour and border, at least 5:1 in both themes). */
+.must-know { margin: 0 0 12px; padding: 10px 12px; border: 2px solid var(--maple); border-radius: 10px; background: var(--maple-tint); color: var(--ink); }
+.must-know .mk-title { margin: 0 0 4px; font: 700 13px/1.3 var(--body); letter-spacing: .04em; text-transform: uppercase; color: var(--maple); }
+.must-know ul.pts { font-size: 14px; gap: 4px; }
+.must-know p.mk-list { margin: 0; font-size: 14px; }
+.place .must-know { margin: 6px 0 8px; }
+@media print { .must-know { background: none; border-color: currentColor; } .must-know .mk-title { color: inherit; } }

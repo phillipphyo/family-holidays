@@ -86,6 +86,8 @@
     var i = s.indexOf(": "), lab = i > 0 ? s.slice(0, i) : "";
     return lab && lab.length <= 40 && lab.split(/\s+/).length <= 4 ? '<b class="lbl">' + fmt(lab + ":") + '</b> ' + fmt(s.slice(i + 2)) : fmt(s);
   }
+  // A 'Must know' box: the few points that must not be missed (a list of points, or one line). Kept rare in the plan.
+  function mustKnow(x) { return txt(x) ? '<div class="must-know" role="note"><p class="mk-title"><span aria-hidden="true">⚠</span> Must know</p>' + pts(x, "mk-list") + '</div>' : ""; }
   // One entry of a list (trip tips, booking lines): a point, or a list whose first point heads its sub-points.
   function ptItem(y) { if (Array.isArray(y)) { y = ptList(y); return y.length ? ptHtml(y[0]) + pts(y.slice(1), "pts-sub") : ""; } return y == null ? "" : ptHtml(String(y)); }
   // cls and id are fixed names written in this file, never data.
@@ -311,7 +313,7 @@
     var body = spots
       ? lead("Where to stand", m.spots) + row("Poses to try", m.poses) + row("Camera angle", m.angles) + row("Best light", m.light) + row("Beat the crowds", m.crowds)
       : info ? lead("", m.lead) + row("What it is", m.what) + row("When we were there", entry.past.visit) + row("Best time to go", m.best) + row("Good to know", m.tips) + row("If we go again", m.again) + row("Places we saved here", (m.pins || []).join(" · "))
-      : lead("", m.why) + (p.nights && txt(p.why) && txt(p.why) !== txt(m.why) ? row("About our stay", p.why) : "") + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + shopRow("Shops: Saturday hours, pay and prices", m.shops) + foodRow("What the food looks like", m.foodPhotos) + phraseRow(m.phrasesTitle || "Ordering card: show this to the staff", m.phrases) + listRow("Nearby", m.nearby) + listRow("Breakfast nearby", m.breakfast) + row("Skip it if", m.skip, "skip");
+      : mustKnow(p.mustKnow) + lead("", m.why) + (p.nights && txt(p.why) && txt(p.why) !== txt(m.why) ? row("About our stay", p.why) : "") + row(hotel ? "Best time to arrive" : "Best time to go", m.best) + row("Good to know", m.tips) + shopRow("Shops: Saturday hours, pay and prices", m.shops) + foodRow("What the food looks like", m.foodPhotos) + phraseRow(m.phrasesTitle || "Ordering card: show this to the staff", m.phrases) + listRow("Nearby", m.nearby) + listRow("Breakfast nearby", m.breakfast) + row("Skip it if", m.skip, "skip");
     var foot = spots
       ? '<div class="links seg"><a class="btn" href="' + u("https://www.google.com/search?tbm=isch&q=" + q(p.name + " best photo spot")) + '" target="_blank" rel="noopener noreferrer">More example photos</a>' +
         (m.tag ? '<a class="btn" href="' + u("https://www.instagram.com/explore/tags/" + encodeURIComponent(m.tag) + "/") + '" target="_blank" rel="noopener noreferrer">#' + esc(m.tag) + ' on Instagram</a>' : "") + '</div>'
@@ -460,7 +462,7 @@
         (names.length ? '<p class="day-stops">' + esc(names.slice(0, 3).join(" · ")) + (names.length > 3 ? ' <span class="muted">+' + (names.length - 3) + ' more</span>' : "") + '</p>' : "") +
         (photosN ? '<p class="day-photos"><span aria-hidden="true">📷</span> ' + photosN + (photosN === 1 ? " photo" : " photos") + '</p>' : "") +
         '<span class="day-toggle" aria-hidden="true"><span class="t-show">Show the day</span><span class="t-hide">Hide the day</span><span class="chev" aria-hidden="true"></span></span>' +
-        '</div></div></summary><div class="day-body"><div class="day-info">' +
+        '</div></div></summary><div class="day-body"><div class="day-info">' + mustKnow(d.mustKnow) +
         (past ? (route ? '<div class="links"><a class="btn small" href="' + u(route) + '" target="_blank" rel="noopener noreferrer">Today\'s stops in Google Maps</a></div>' : "") : stopsList(d, route)) +
         pts(d.travel, "travel") +
         (d.walk || d.ifTired ? '<div class="walk">' + (d.walk ? '<span><b>Walking</b> ' + esc(d.walk) + '</span>' : "") + (d.ifTired ? '<span><b>If tired</b> ' + esc(d.ifTired) + '</span>' : "") + '</div>' : "") +
@@ -490,7 +492,7 @@
           return '<div class="place">' + pic({ image: p.image, wiki: p.wiki, credit: p.credit, name: p.name, type: p.type, area: p.areaPhoto, decorative: true }) +
             '<div class="body"><div class="top"><span class="card-no" aria-hidden="true">' + (pi + 1) + '</span><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
             (p.time ? '<span class="time">' + esc(p.time) + '</span>' : "") + (shots[p.name] ? '<span class="time">📷 ' + shots[p.name] + '</span>' : "") + '</div>' +
-            '<h4><span class="sr-only">Stop ' + (pi + 1) + ': </span>' + esc(p.name) + '</h4>' + pts(p.note, "note") + infoLink(p) + '<div class="card-actions">' + moreButton(p, d.city) + linkRow(p) + '</div></div></div>';
+            '<h4><span class="sr-only">Stop ' + (pi + 1) + ': </span>' + esc(p.name) + '</h4>' + mustKnow(p.mustKnow) + pts(p.note, "note") + infoLink(p) + '<div class="card-actions">' + moreButton(p, d.city) + linkRow(p) + '</div></div></div>';
         }).join("") + '</div>';
       }
       if (mem.length) html += memoryGrid(mem);
@@ -525,7 +527,7 @@
     return '<div class="place">' + pic({ image: own ? own.thumb || own.image : p.image, vk: own && !own.thumb && !own.image ? h.id + ":" + own.k : "", wiki: own ? "" : p.wiki, name: p.name, type: p.type, decorative: true }) +
             '<div class="body"><div class="top"><span class="card-no" aria-hidden="true">' + (pi + 1) + '</span><span class="chip" style="color:' + tone(p.type) + '">' + esc(TYPE_LABEL[p.type] || "Place") + '</span>' +
             (v && v.first ? '<span class="time">' + esc(v.first + (v.last && v.last !== v.first ? " to " + v.last : "")) + '</span>' : "") + (v ? '<span class="time">📷 ' + v.mems.length + '</span>' : "") + '</div>' +
-            '<h4><span class="sr-only">Stop ' + (pi + 1) + ': </span>' + esc(p.name) + '</h4>' + (p.info && p.info.lead ? '<p class="note">' + esc(p.info.lead) + '</p>' : "") +
+            '<h4><span class="sr-only">Stop ' + (pi + 1) + ': </span>' + esc(p.name) + '</h4>' + mustKnow(p.mustKnow) + (p.info && p.info.lead ? '<p class="note">' + esc(p.info.lead) + '</p>' : "") +
             '<div class="card-actions">' + moreButton(p, d.city, { visit: visitText(d, v), pic: own, photos: "" }) + linkRow(p) + '</div></div></div>';
   }
   // Each ride as "how: time, how often, cost", with the part before the first colon in bold.
